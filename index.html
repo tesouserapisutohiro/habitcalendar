@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Habit Vibe 6.3</title>
+    <title>Habit Vibe 6.4</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -27,14 +27,13 @@
 
         const HabitTracker = () => {
             const [history, setHistory] = useState([]);
-            const [inputValues, setInputValues] = useState({ hiit: "", greenEx: "", meditation: "", pages: "" });
+            const [inputValues, setInputValues] = useState({ hiit: "", greenEx: "", meditation: "", pages: "", cooking: "", mission: "" });
             const [activeTab, setActiveTab] = useState('input');
-            const [lastSaved, setLastSaved] = useState(""); // 保存時刻の表示用
+            const [lastSaved, setLastSaved] = useState("");
             
             const currentMonth = new Date().toISOString().slice(0, 7);
-            const today = new Date().toLocaleDateString('sv-SE'); // YYYY-MM-DD形式
+            const today = new Date().toLocaleDateString('sv-SE');
 
-            // 起動時に保存データを読み込む
             useEffect(() => {
                 const saved = localStorage.getItem('habit-v6-direct');
                 if (saved) {
@@ -43,23 +42,24 @@
                 }
             }, []);
 
-            // データを保存する関数（スマホのメモリに書き込む）
             const updateStorage = (newHistory) => {
                 setHistory(newHistory);
                 localStorage.setItem('habit-v6-direct', JSON.stringify(newHistory));
-                // 保存した時刻を表示する
                 const now = new Date();
                 setLastSaved(`保存済: ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`);
             };
 
             const addItem = (key, value) => {
-                if (!value || isNaN(value)) return;
+                if (!value) return;
+                const entryValue = key === 'mission' ? value : parseInt(value, 10);
+                if (key !== 'mission' && isNaN(entryValue)) return;
+
                 const newEntry = { 
                     id: Date.now(), 
                     date: today, 
                     month: currentMonth, 
                     key, 
-                    value: parseInt(value, 10) 
+                    value: entryValue 
                 };
                 updateStorage([...history, newEntry]);
                 setInputValues({ ...inputValues, [key]: "" });
@@ -72,63 +72,43 @@
                 entry ? deleteEntry(entry.id) : addItem(key, 1);
             };
 
-            // 各種集計
             const todayTotals = useMemo(() => history.filter(e => e.date === today).reduce((acc, curr) => {
-                acc[curr.key] = (acc[curr.key] || 0) + curr.value;
+                if (typeof curr.value === 'number') {
+                    acc[curr.key] = (acc[curr.key] || 0) + curr.value;
+                }
                 return acc;
             }, {}), [history, today]);
 
+            const todayMissions = useMemo(() => 
+                history.filter(e => e.date === today && e.key === 'mission'), 
+            [history, today]);
+
             const monthTotals = useMemo(() => history.filter(e => e.month === currentMonth).reduce((acc, curr) => {
-                acc[curr.key] = (acc[curr.key] || 0) + curr.value;
+                if (typeof curr.value === 'number') {
+                    acc[curr.key] = (acc[curr.key] || 0) + curr.value;
+                }
                 return acc;
             }, {}), [history, currentMonth]);
 
-            const weeklyStats = useMemo(() => {
-                const days = [...Array(7)].map((_, i) => {
-                    const d = new Date();
-                    d.setDate(d.getDate() - i);
-                    return d.toLocaleDateString('sv-SE');
-                }).reverse();
-
-                return days.map(date => ({
-                    date: date.slice(5),
-                    total: history.filter(e => e.date === date && e.key !== 'booksFinished').reduce((acc, curr) => acc + curr.value, 0)
-                }));
-            }, [history]);
-
-            const personalBests = useMemo(() => {
-                const monthlyMap = history.reduce((acc, curr) => {
-                    const k = `${curr.month}-${curr.key}`;
-                    acc[k] = (acc[k] || 0) + curr.value;
-                    return acc;
-                }, {});
-                const bests = {};
-                Object.keys(monthlyMap).forEach(keyStr => {
-                    const k = keyStr.split('-').slice(2).join('-');
-                    if (!bests[k] || monthlyMap[keyStr] > bests[k]) bests[k] = monthlyMap[keyStr];
-                });
-                return bests;
-            }, [history]);
-
             const catMessage = useMemo(() => {
                 const messages = [
-                  { cat: "シウ (サバトラ)", msg: "hiroさん、今日もコツコツ頑張ってるね！" },
-                  { cat: "ケン (茶トラ)", msg: "ボクたちが見守ってるから大丈夫だニャ〜" },
-                  { cat: "シウ (サバトラ)", msg: "データはちゃんとボクが守っておくニャ！" },
-                  { cat: "ケン (茶トラ)", msg: "明日になったらまた新しい1日が始まるニャ！" }
+                  { cat: "シウ (サバトラ)", msg: "hiroさん、今日の料理も美味しそうだね！" },
+                  { cat: "ケン (茶トラ)", msg: "ミッション達成！hiroさんは有言実行だニャ〜" },
+                  { cat: "シウ (サバトラ)", msg: "自炊を続けるhiroさんは、ボクたちの誇りだニャ！" },
+                  { cat: "ケン (茶トラ) ", msg: "新しいアプリ作り、ボクも応援してるニャ！" }
                 ];
                 return messages[Math.floor(Math.random() * messages.length)];
-            }, [todayTotals]);
+            }, [todayTotals, todayMissions.length]);
 
-            const InputCard = ({ id, label, icon, color, unit, children }) => (
+            const InputCard = ({ id, label, icon, color, unit }) => (
                 <div className="p-4 rounded-3xl bg-white border border-slate-100 shadow-sm space-y-3">
                     <div className="flex items-center justify-between font-bold text-slate-500">
                         <div className="flex items-center gap-2">
                             <Icon name={icon} className={color} />
                             <span className="text-sm">{label}</span>
                         </div>
-                        <div className="text-right text-xs">
-                            <span className="text-lg font-black text-slate-700">{(todayTotals[id] || 0)}</span>
+                        <div className="text-right text-xs text-slate-700">
+                            <span className="text-lg font-black">{(todayTotals[id] || 0)}</span>
                             <span className="text-[10px] text-slate-400 ml-0.5">{unit}</span>
                         </div>
                     </div>
@@ -141,15 +121,14 @@
                             <Icon name="plus" />
                         </button>
                     </div>
-                    {children}
                 </div>
             );
 
             return (
-                <div className="max-w-md mx-auto p-4 pb-24">
+                <div className="max-w-md mx-auto p-4 pb-24 font-sans">
                     <header className="flex justify-between items-center mb-4 px-1">
                         <div>
-                          <h1 className="text-2xl font-black text-indigo-600 italic">Habit Vibe 6.3</h1>
+                          <h1 className="text-2xl font-black text-indigo-600 italic">Habit Vibe 6.4</h1>
                           <div className="flex items-center gap-2">
                             <span className="text-[10px] font-bold text-emerald-500 flex items-center gap-1">
                                 <Icon name="check-circle" size={10} /> {lastSaved}
@@ -174,25 +153,41 @@
                           <p className="font-bold text-sm leading-relaxed italic">「{catMessage.msg}」</p>
                         </div>
                       </div>
-                      <div className="absolute -bottom-4 -right-4 text-white/10 rotate-12"><Icon name="cat" size={80} /></div>
                     </div>
 
                     {activeTab === 'input' ? (
                       <div className="space-y-4 animate-in fade-in duration-500">
-                        <InputCard id="greenEx" label="グリーンEX" icon="tree-pine" color="text-emerald-500" unit="分" />
-                        <InputCard id="meditation" label="瞑想" icon="flower-2" color="text-purple-500" unit="分" />
-                        
-                        <InputCard id="pages" label="読書" icon="book-open" color="text-orange-500" unit="頁">
-                            <div className="flex items-center justify-between pt-1 border-t border-slate-50 mt-1">
-                                <span className="text-[10px] font-bold text-slate-400">今月の読了: {monthTotals['booksFinished'] || 0} 冊</span>
-                                <button onClick={() => addItem('booksFinished', 1)} className="bg-orange-100 text-orange-600 text-[10px] font-black px-3 py-1 rounded-full active:scale-95 flex items-center gap-1">
-                                    <Icon name="book" size={12} /> 読了！
+                        {/* 今日のミッション入力 */}
+                        <div className="p-4 rounded-3xl bg-indigo-50 border border-indigo-100 shadow-sm space-y-3">
+                            <div className="flex items-center gap-2 font-bold text-indigo-600">
+                                <Icon name="flag" />
+                                <span className="text-sm">今日のミッション達成！</span>
+                            </div>
+                            <div className="flex gap-2">
+                                <input type="text" placeholder="例：アプリを更新した！" value={inputValues.mission}
+                                    onChange={(e) => setInputValues({...inputValues, mission: e.target.value})}
+                                    className="flex-1 bg-white border-none rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                                />
+                                <button onClick={() => addItem('mission', inputValues.mission)} className="bg-indigo-600 text-white p-2 rounded-xl shadow-md active:scale-90 transition-transform">
+                                    <Icon name="send" />
                                 </button>
                             </div>
-                        </InputCard>
+                            <div className="flex flex-wrap gap-2">
+                                {todayMissions.map(m => (
+                                    <div key={m.id} className="bg-white px-3 py-1 rounded-full text-[10px] font-bold text-indigo-600 shadow-sm flex items-center gap-1">
+                                        <span>{m.value}</span>
+                                        <button onClick={() => deleteEntry(m.id)}><Icon name="x" size={10} /></button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
 
+                        <InputCard id="cooking" label="料理" icon="utensils" color="text-rose-500" unit="回" />
+                        <InputCard id="greenEx" label="グリーンEX" icon="tree-pine" color="text-emerald-500" unit="分" />
+                        <InputCard id="meditation" label="瞑想" icon="flower-2" color="text-purple-500" unit="分" />
+                        <InputCard id="pages" label="読書" icon="book-open" color="text-orange-500" unit="頁" />
                         <InputCard id="hiit" label="HIIT" icon="zap" color="text-red-500" unit="分" />
-                        
+
                         <div className="grid grid-cols-2 gap-4">
                             <button onClick={() => toggleAction('coldWater')} className={`p-4 rounded-3xl border flex flex-col items-center gap-2 transition-all ${todayTotals['coldWater'] ? 'bg-blue-500 text-white shadow-lg border-blue-600' : 'bg-white text-blue-500 border-slate-100'}`}>
                                 <Icon name="droplets" size={24} /> <span className="text-xs font-black">冷水</span>
@@ -202,60 +197,34 @@
                             </button>
                         </div>
 
-                        <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100">
-                            <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 italic flex justify-between">
-                                <span>今日のログ（修正用）</span>
-                                <span>{today.replace(/-/g, '/')}</span>
-                            </h2>
-                            <div className="space-y-1">
-                                {history.filter(e => e.date === today).reverse().map(entry => (
-                                    <div key={entry.id} className="flex justify-between items-center py-1">
-                                        <span className="text-[10px] font-bold text-slate-300">{entry.key === 'booksFinished' ? '読了' : entry.key}</span>
-                                        <div className="flex items-center gap-3">
-                                            <span className="font-bold text-xs text-slate-600">+{entry.value}</span>
-                                            <button onClick={() => deleteEntry(entry.id)} className="text-slate-200 hover:text-red-400"><Icon name="trash-2" size={12} /></button>
-                                        </div>
+                        <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100 text-[10px] text-slate-400">
+                            <h2 className="font-bold uppercase tracking-widest mb-2 italic">今日の全ログ</h2>
+                            {history.filter(e => e.date === today).reverse().map(entry => (
+                                <div key={entry.id} className="flex justify-between items-center py-1 border-b border-slate-50 last:border-0">
+                                    <span>{entry.key}</span>
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-bold text-slate-600">{entry.value}</span>
+                                        <button onClick={() => deleteEntry(entry.id)} className="text-slate-200 hover:text-red-400"><Icon name="trash-2" size={12} /></button>
                                     </div>
-                                ))}
-                            </div>
+                                </div>
+                            ))}
                         </div>
                       </div>
                     ) : (
                       <div className="space-y-6 animate-in slide-in-from-right duration-500">
-                        <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100">
-                          <h2 className="text-xs font-bold text-slate-400 mb-6 flex items-center gap-2 uppercase tracking-widest"><Icon name="calendar" size={14}/> 過去7日間の活動</h2>
-                          <div className="h-32 flex items-end gap-2 px-1">
-                            {weeklyStats.map((day, i) => {
-                              const maxTotal = Math.max(...weeklyStats.map(d => d.total), 1);
-                              return (
-                                <div key={i} className="flex-1 flex flex-col items-center gap-2">
-                                  <div className="w-full bg-slate-100 rounded-t-lg relative flex items-end overflow-hidden" style={{ height: '100%' }}>
-                                    <div className="w-full bg-indigo-500 transition-all duration-1000" style={{ height: `${(day.total / maxTotal) * 100}%` }}></div>
-                                  </div>
-                                  <span className="text-[8px] font-bold text-slate-400">{day.date}</span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-
                         <div className="bg-slate-900 rounded-[2rem] p-6 text-white shadow-xl">
                           <h2 className="text-xs font-bold text-indigo-300 mb-6 flex items-center gap-2 uppercase tracking-widest"><Icon name="pie-chart" size={14}/> 月間レポート</h2>
-                          {['greenEx', 'pages', 'hiit'].map(key => (
+                          {['cooking', 'greenEx', 'pages', 'hiit'].map(key => (
                             <div key={key} className="mb-4 space-y-2">
                               <div className="flex justify-between text-[10px] font-bold">
-                                <span className="text-slate-400 uppercase">{key === 'greenEx' ? 'Green EX' : key.toUpperCase()}</span>
-                                <span className="text-indigo-200">{monthTotals[key] || 0} / Best: {personalBests[key] || 0}</span>
+                                <span className="text-slate-400 uppercase">{key}</span>
+                                <span className="text-indigo-200">{monthTotals[key] || 0} 合計</span>
                               </div>
-                              <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                                <div className="h-full bg-indigo-400" style={{ width: `${personalBests[key] > 0 ? Math.min(100, ((monthTotals[key] || 0) / personalBests[key]) * 100) : 0}%` }}></div>
+                              <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
+                                <div className="h-full bg-indigo-400" style={{ width: `${Math.min(100, (monthTotals[key] || 0))}%` }}></div>
                               </div>
                             </div>
                           ))}
-                          <div className="pt-4 mt-4 border-t border-slate-800 flex justify-between items-center text-xs">
-                              <span className="font-bold text-indigo-300 uppercase">読了総数</span>
-                              <span className="font-black">{monthTotals['booksFinished'] || 0} 冊</span>
-                          </div>
                         </div>
                       </div>
                     )}
