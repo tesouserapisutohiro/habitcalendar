@@ -1,76 +1,219 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MindBody Habit Tracker</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script type="importmap">
-    {
-        "imports": {
-            "react": "https://esm.sh/react@19.0.0",
-            "react-dom": "https://esm.sh/react-dom@19.0.0",
-            "lucide-react": "https://esm.sh/lucide-react@0.474.0"
-        }
+import React, { useState, useEffect, useMemo } from 'react';
+import { 
+  TreePine, Flower2, Droplets, BookOpen, Utensils, Box, 
+  BarChart3, Save, CheckCircle2, Calendar, Zap, RotateCcw, Trophy, ChevronRight, X 
+} from 'lucide-react';
+
+const HabitTracker = () => {
+  // --- 1. 状態管理（State） ---
+  const [dailyData, setDailyData] = useState({
+    greenEx: 0, meditation: 0, coldWater: 0,
+    pages: 0, books: 0, cooking: 0, bento: 0, hiit: 0
+  });
+
+  const [history, setHistory] = useState([]);
+  const [selectedItem, setSelectedItem] = useState(null); // 詳細モーダル表示用
+  
+  // 現在の年月（例: 2026-02）
+  const currentMonth = new Date().toISOString().slice(0, 7);
+
+  // ローカルストレージからデータを読み込み
+  useEffect(() => {
+    const savedData = localStorage.getItem('habit-v5-data');
+    if (savedData) {
+      setHistory(JSON.parse(savedData));
     }
-    </script>
-    <style>
-        body { background-color: #f8fafc; font-family: sans-serif; }
-        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
-        .day-cell { aspect-ratio: 1; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 0.875rem; cursor: pointer; border: 1px solid #e2e8f0; background: white; }
-        .day-today { border: 2px solid #3b82f6; font-weight: bold; background-color: #eff6ff; color: #3b82f6; }
-    </style>
-</head>
-<body>
-    <div id="root"></div>
-    <script type="module">
-        import React, { useState } from 'react';
-        import ReactDOM from 'react-dom/client';
-        import { Calendar as CalendarIcon, CheckCircle2 } from 'lucide-react';
+  }, []);
 
-        const App = () => {
-            const [selectedDate] = useState(new Date());
-            const habits = [
-                { id: 1, name: '弁当（低FODMAP）', icon: '🍱' },
-                { id: 2, name: '読書', icon: '📚' },
-                { id: 3, name: '運動', icon: '🏃' },
-                { id: 4, name: '瞑想', icon: '🧘' }
-            ];
+  // --- 2. データ集計ロジック ---
 
-            return React.createElement('div', { className: 'max-w-md mx-auto p-4' },
-                React.createElement('div', { className: 'bg-white rounded-3xl shadow-lg p-6 mb-6' },
-                    React.createElement('div', { className: 'flex items-center gap-3 mb-8' },
-                        React.createElement(CalendarIcon, { className: 'text-blue-600', size: 28 }),
-                        React.createElement('h1', { className: 'text-2xl font-black text-gray-800' }, 'MindBody')
-                    ),
-                    React.createElement('div', { className: 'calendar-grid mb-8' },
-                        Array.from({ length: 28 }).map((_, i) => 
-                            React.createElement('div', { 
-                                key: i, 
-                                className: `day-cell ${i + 1 === selectedDate.getDate() ? 'day-today' : 'text-gray-500'}`
-                            }, i + 1)
-                        )
-                    ),
-                    React.createElement('h2', { className: 'text-lg font-bold mb-4 text-gray-800' }, `2月${selectedDate.getDate()}日の記録`),
-                    React.createElement('div', { className: 'space-y-3' },
-                        habits.map(habit => 
-                            React.createElement('div', { key: habit.id, className: 'flex items-center justify-between p-4 bg-gray-50 rounded-2xl' },
-                                React.createElement('div', { className: 'flex items-center gap-4' },
-                                    React.createElement('span', { className: 'text-2xl' }, habit.icon),
-                                    React.createElement('span', { className: 'font-medium' }, habit.name)
-                                ),
-                                React.createElement('button', { className: 'text-gray-300 hover:text-green-500' },
-                                    React.createElement(CheckCircle2, { size: 24 })
-                                )
-                            )
-                        )
-                    )
-                )
-            );
-        };
+  // 全履歴から月別集計オブジェクトを作成
+  const allMonthlyStats = useMemo(() => {
+    return history.reduce((acc, curr) => {
+      const m = curr.month;
+      if (!acc[m]) {
+        acc[m] = { greenEx: 0, meditation: 0, coldWater: 0, pages: 0, books: 0, cooking: 0, bento: 0, hiit: 0 };
+      }
+      Object.keys(acc[m]).forEach(key => {
+        acc[m][key] += (curr[key] || 0);
+      });
+      return acc;
+    }, {});
+  }, [history]);
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(React.createElement(App));
-    </script>
-</body>
-</html>
+  // 今月の合計値
+  const currentMonthTotals = allMonthlyStats[currentMonth] || {
+    greenEx: 0, meditation: 0, coldWater: 0, pages: 0, books: 0, cooking: 0, bento: 0, hiit: 0
+  };
+
+  // 全期間の中での月間自己ベストを算出
+  const personalBests = useMemo(() => {
+    const months = Object.values(allMonthlyStats);
+    const keys = ['greenEx', 'meditation', 'coldWater', 'pages', 'cooking', 'bento', 'hiit'];
+    
+    // データがない場合の初期値
+    if (months.length === 0) {
+      return keys.reduce((acc, key) => ({ ...acc, [key]: 0 }), {});
+    }
+
+    return keys.reduce((acc, key) => {
+      acc[key] = Math.max(...months.map(m => m[key] || 0), 0);
+      return acc;
+    }, {});
+  }, [allMonthlyStats]);
+
+  // --- 3. アクションハンドラ ---
+
+  const handleSave = () => {
+    const today = new Date().toISOString().split('T')[0];
+    const newData = { 
+      date: today, 
+      month: today.slice(0, 7), 
+      ...dailyData 
+    };
+
+    // 同じ日のデータがあれば上書き、なければ新規追加
+    const filteredHistory = history.filter(item => item.date !== today);
+    const updatedHistory = [...filteredHistory, newData];
+    
+    setHistory(updatedHistory);
+    localStorage.setItem('habit-v5-data', JSON.stringify(updatedHistory));
+    
+    alert('今日の成果を刻みました！ナイスバイブス！');
+    
+    // 保存後、入力欄をリセット（任意）
+    setDailyData({
+      greenEx: 0, meditation: 0, coldWater: 0,
+      pages: 0, books: 0, cooking: 0, bento: 0, hiit: 0
+    });
+  };
+
+  // --- 4. UI設定 ---
+
+  const habitConfigs = {
+    hiit: { label: 'HIIT', unit: '分', color: 'bg-red-500', icon: <Zap size={16} fill="currentColor"/> },
+    greenEx: { label: 'グリーンEX', unit: '分', color: 'bg-emerald-500', icon: <TreePine size={16}/> },
+    meditation: { label: '瞑想', unit: '分', color: 'bg-purple-500', icon: <Flower2 size={16}/> },
+    pages: { label: '読書', unit: '頁', color: 'bg-orange-500', icon: <BookOpen size={16}/> },
+    coldWater: { label: '冷水', unit: '回', color: 'bg-blue-500', icon: <Droplets size={16}/> },
+    cooking: { label: '料理', unit: '回', color: 'bg-rose-500', icon: <Utensils size={16}/> },
+    bento: { label: 'お弁当', unit: '回', color: 'bg-amber-500', icon: <Box size={16}/> },
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 p-4 md:p-8 text-slate-800 pb-20 font-sans">
+      <header className="max-w-md mx-auto mb-6 flex justify-between items-end">
+        <div>
+          <h1 className="text-2xl font-black text-indigo-600 tracking-tighter italic">Habit Vibe 5.0</h1>
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] flex items-center gap-1">
+            <Calendar size={12} /> {currentMonth.replace('-', ' / ')} status
+          </p>
+        </div>
+        <div className="p-2 bg-amber-100 rounded-full text-amber-500">
+          <Trophy size={20} />
+        </div>
+      </header>
+
+      <main className="max-w-md mx-auto space-y-6">
+        {/* クイック入力パネル */}
+        <div className="bg-white rounded-[2.5rem] p-6 shadow-xl shadow-slate-200/50 border border-white">
+          <h2 className="font-bold mb-4 text-slate-400 text-xs uppercase tracking-widest">Quick Record</h2>
+          
+          {/* HIIT専用セクション */}
+          <div className="p-5 bg-red-50 rounded-[2rem] border border-red-100 mb-4 transition-all">
+             <div className="flex justify-between items-center mb-4">
+                <span className="font-bold flex items-center gap-2 text-red-600">
+                  <Zap size={18} fill="currentColor"/> HIIT
+                </span>
+                <span className="text-2xl font-black text-red-600">
+                  {dailyData.hiit}<small className="text-xs ml-1 font-bold">min</small>
+                </span>
+             </div>
+             <div className="grid grid-cols-4 gap-2">
+                {[2, 4, 6, 8].map(m => (
+                  <button 
+                    key={m} 
+                    onClick={() => setDailyData({...dailyData, hiit: dailyData.hiit + m})} 
+                    className="bg-white py-3 rounded-2xl text-sm font-black text-red-500 shadow-sm border border-red-100 hover:bg-red-500 hover:text-white active:scale-95 transition-all"
+                  >
+                    +{m}
+                  </button>
+                ))}
+             </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 mb-6">
+            {/* グリーンEX入力 */}
+            <div className="bg-emerald-50 p-4 rounded-[1.5rem] border border-emerald-100">
+               <span className="text-[10px] font-bold text-emerald-600 block mb-2 uppercase">Green EX</span>
+               <div className="flex items-center justify-between">
+                  <button onClick={() => setDailyData({...dailyData, greenEx: Math.max(0, dailyData.greenEx - 30)})} className="w-8 h-8 bg-white rounded-full shadow-sm text-emerald-600 font-bold">-</button>
+                  <span className="font-black text-emerald-700">{dailyData.greenEx}</span>
+                  <button onClick={() => setDailyData({...dailyData, greenEx: dailyData.greenEx + 30})} className="w-8 h-8 bg-white rounded-full shadow-sm text-emerald-600 font-bold">+</button>
+               </div>
+            </div>
+            {/* 読書入力 */}
+            <div className="bg-orange-50 p-4 rounded-[1.5rem] border border-orange-100">
+               <span className="text-[10px] font-bold text-orange-600 block mb-2 uppercase">Reading</span>
+               <div className="flex items-center justify-between">
+                  <button onClick={() => setDailyData({...dailyData, pages: Math.max(0, dailyData.pages - 10)})} className="w-8 h-8 bg-white rounded-full shadow-sm text-orange-600 font-bold">-</button>
+                  <span className="font-black text-orange-700">{dailyData.pages}</span>
+                  <button onClick={() => setDailyData({...dailyData, pages: dailyData.pages + 10})} className="w-8 h-8 bg-white rounded-full shadow-sm text-orange-600 font-bold">+</button>
+               </div>
+            </div>
+          </div>
+
+          <button 
+            onClick={handleSave} 
+            className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black shadow-lg shadow-indigo-100 hover:bg-indigo-700 active:scale-95 transition-all flex items-center justify-center gap-2"
+          >
+            <Save size={20} /> 今日の努力を保存する
+          </button>
+        </div>
+
+        {/* 達成度一覧 */}
+        <div className="bg-white rounded-[2.5rem] p-6 shadow-lg border border-slate-50 space-y-2">
+          <h2 className="font-bold text-slate-400 text-[10px] uppercase tracking-[0.2em] mb-4 ml-2">Achievement</h2>
+          {Object.entries(habitConfigs).map(([key, config]) => (
+            <button 
+              key={key}
+              onClick={() => setSelectedItem(key)}
+              className="w-full text-left p-4 rounded-2xl hover:bg-slate-50 transition-all group active:scale-[0.98]"
+            >
+              <PerformanceRow 
+                label={config.label}
+                current={currentMonthTotals[key] || 0}
+                best={personalBests[key] || 0}
+                unit={config.unit}
+                color={config.color}
+              />
+            </button>
+          ))}
+        </div>
+      </main>
+
+      {/* --- 詳細分析モーダル --- */}
+      {selectedItem && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-end md:items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl animate-in slide-in-from-bottom duration-300 border border-white">
+            <div className="flex justify-between items-start mb-8">
+              <div className="flex items-center gap-4">
+                <div className={`w-14 h-14 ${habitConfigs[selectedItem].color} text-white rounded-[1.2rem] flex items-center justify-center shadow-lg`}>
+                  {habitConfigs[selectedItem].icon}
+                </div>
+                <div>
+                  <h3 className="text-2xl font-black tracking-tight">{habitConfigs[selectedItem].label}</h3>
+                  <p className="text-xs font-bold text-slate-400">Monthly Performance</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setSelectedItem(null)} 
+                className="p-2 bg-slate-100 rounded-full text-slate-400 hover:bg-slate-200 transition-colors"
+              >
+                <X size={20}/>
+              </button>
+            </div>
+
+            {/* 月別バーチャート */}
+            <div className="h-40 flex items-end gap-4 mb-10 px-2">
+              {Object.entries(allMonthlyStats).slice(-5).map(([month,
