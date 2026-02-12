@@ -2,127 +2,161 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Habit Vibe 5.0 - Hiro's Calendar</title>
-    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Habit Vibe 6.0</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        body { background-color: #f8fafc; }
+        body { -webkit-tap-highlight-color: transparent; }
+        input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
     </style>
 </head>
-<body>
+<body class="bg-slate-50 text-slate-800 font-sans">
     <div id="root"></div>
 
     <script type="text/babel">
-        // 1. 使う道具を準備する
         const { useState, useEffect, useMemo } = React;
 
-        // 2. メインのプログラム (Habit Vibe 5.0)
-        const HabitTracker = () => {
-            // --- 状態管理 (データの保存場所) ---
-            const [dailyData, setDailyData] = useState({ 
-                greenEx: 0, meditation: 0, coldWater: 0, pages: 0, 
-                books: 0, cooking: 0, bento: 0, hiit: 0 
-            });
-            const [history, setHistory] = useState([]);
-            const [selectedItem, setSelectedItem] = useState(null);
-            
-            const currentMonth = new Date().toISOString().slice(0, 7);
+        // アイコンコンポーネントを簡易化
+        const Icon = ({ name, size = 18, className = "" }) => {
+            useEffect(() => { lucide.createIcons(); }, []);
+            return <i data-lucide={name} className={`${className}`} style={{ width: size, height: size }}></i>;
+        };
 
-            // ローカルストレージからデータを読み込む
+        const HabitTracker = () => {
+            const [history, setHistory] = useState([]);
+            const [inputValues, setInputValues] = useState({ hiit: "", greenEx: "", meditation: "", pages: "" });
+            const currentMonth = new Date().toISOString().slice(0, 7);
+            const today = new Date().toISOString().split('T')[0];
+
             useEffect(() => {
-                const savedData = localStorage.getItem('habit-v5-data');
-                if (savedData) setHistory(JSON.parse(savedData));
+                const saved = localStorage.getItem('habit-v6-direct');
+                if (saved) setHistory(JSON.parse(saved));
+                lucide.createIcons();
             }, []);
 
-            // --- データ集計ロジック ---
-            const allMonthlyStats = useMemo(() => {
-                return history.reduce((acc, curr) => {
-                    const m = curr.month;
-                    if (!acc[m]) acc[m] = { greenEx: 0, meditation: 0, coldWater: 0, pages: 0, books: 0, cooking: 0, bento: 0, hiit: 0 };
-                    Object.keys(acc[m]).forEach(key => { acc[m][key] += (curr[key] || 0); });
-                    return acc;
-                }, {});
-            }, [history]);
+            const updateStorage = (newHistory) => {
+                setHistory(newHistory);
+                localStorage.setItem('habit-v6-direct', JSON.stringify(newHistory));
+            };
+
+            const addItem = (key, value) => {
+                if (!value || isNaN(value)) return;
+                const newEntry = { id: Date.now(), date: today, month: currentMonth, key, value: parseInt(value, 10) };
+                updateStorage([...history, newEntry]);
+                setInputValues({ ...inputValues, [key]: "" });
+            };
+
+            const deleteEntry = (id) => updateStorage(history.filter(e => e.id !== id));
+
+            const toggleAction = (key) => {
+                const entry = history.find(e => e.date === today && e.key === key);
+                entry ? deleteEntry(entry.id) : addItem(key, 1);
+            };
+
+            const totals = useMemo(() => history.reduce((acc, curr) => {
+                const scope = curr.date === today ? 'today' : 'other';
+                if (!acc[curr.key]) acc[curr.key] = { today: 0, month: 0 };
+                if (curr.date === today) acc[curr.key].today += curr.value;
+                if (curr.month === currentMonth) acc[curr.key].month += curr.value;
+                return acc;
+            }, {}), [history, today, currentMonth]);
 
             const personalBests = useMemo(() => {
-                const months = Object.values(allMonthlyStats);
-                const keys = ['greenEx', 'meditation', 'coldWater', 'pages', 'cooking', 'bento', 'hiit'];
-                if (months.length === 0) return keys.reduce((acc, key) => ({ ...acc, [key]: 0 }), {});
-                return keys.reduce((acc, key) => ({
-                    ...acc,
-                    [key]: Math.max(...months.map(m => m[key] || 0), 0)
-                }), {});
-            }, [allMonthlyStats]);
+                const monthlyMap = history.reduce((acc, curr) => {
+                    const k = `${curr.month}-${curr.key}`;
+                    acc[k] = (acc[k] || 0) + curr.value;
+                    return acc;
+                }, {});
+                const bests = {};
+                Object.keys(monthlyMap).forEach(keyStr => {
+                    const k = keyStr.split('-').slice(2).join('-'); // month-keyからkeyを抽出
+                    if (!bests[k] || monthlyMap[keyStr] > bests[k]) bests[k] = monthlyMap[keyStr];
+                });
+                return bests;
+            }, [history]);
 
-            // 保存ボタンの処理
-            const handleSave = () => {
-                const today = new Date().toISOString().split('T')[0];
-                const newData = { date: today, month: today.slice(0, 7), ...dailyData };
-                const updatedHistory = [...history.filter(item => item.date !== today), newData];
-                
-                setHistory(updatedHistory);
-                localStorage.setItem('habit-v5-data', JSON.stringify(updatedHistory));
-                alert("今日の成果を刻みました！ナイスバイブス！");
-                
-                // 入力欄をリセット
-                setDailyData({ greenEx: 0, meditation: 0, coldWater: 0, pages: 0, books: 0, cooking: 0, bento: 0, hiit: 0 });
-            };
-
-            const habitConfigs = {
-                hiit: { label: 'HIIT', unit: '分', color: 'bg-red-500', icon: 'Zap' },
-                greenEx: { label: 'グリーンEX', unit: '分', color: 'bg-emerald-500', icon: 'TreePine' },
-                meditation: { label: '瞑想', unit: '分', color: 'bg-purple-500', icon: 'Flower2' },
-                pages: { label: '読書', unit: '頁', color: 'bg-orange-500', icon: 'BookOpen' },
-                coldWater: { label: '冷水', unit: '回', color: 'bg-blue-500', icon: 'Droplets' },
-                cooking: { label: '料理', unit: '回', color: 'bg-rose-500', icon: 'Utensils' },
-                bento: { label: 'お弁当', unit: '回', color: 'bg-amber-500', icon: 'Box' }
-            };
+            const InputCard = ({ id, label, icon, color, unit }) => (
+                <div className="p-4 rounded-3xl bg-white border border-slate-100 shadow-sm space-y-3">
+                    <div className="flex items-center gap-2 font-bold text-slate-500">
+                        <Icon name={icon} className={color} />
+                        <span className="text-sm">{label}</span>
+                    </div>
+                    <div className="flex gap-2">
+                        <input type="number" inputMode="numeric" placeholder={`${unit}を入力`} value={inputValues[id]}
+                            onChange={(e) => setInputValues({...inputValues, [id]: e.target.value})}
+                            className="flex-1 bg-slate-50 border-none rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                        />
+                        <button onClick={() => addItem(id, inputValues[id])} className="bg-indigo-600 text-white p-2 rounded-xl shadow-md active:scale-90 transition-transform">
+                            <Icon name="plus" />
+                        </button>
+                    </div>
+                    <div className="text-right text-xs">
+                        <span className="text-slate-400 font-bold uppercase">Today: </span>
+                        <span className="text-lg font-black text-slate-700">{(totals[id]?.today || 0)}</span>
+                        <span className="text-[10px] text-slate-400 ml-1">{unit}</span>
+                    </div>
+                </div>
+            );
 
             return (
-                <div className="max-w-md mx-auto p-4 font-sans">
-                    <h1 className="text-2xl font-bold mb-4 text-slate-800">Habit Vibe 5.0</h1>
-                    <p className="text-sm text-slate-500 mb-6">{currentMonth.replace('-', '/')} status</p>
+                <div className="max-w-md mx-auto p-4 pb-20">
+                    <header className="flex justify-between items-center mb-6">
+                        <h1 className="text-2xl font-black text-indigo-600 italic">Habit Vibe 6.0</h1>
+                        <span className="text-[10px] font-bold text-slate-400 bg-white px-3 py-1 rounded-full shadow-sm">
+                            {today.replace(/-/g, '/')}
+                        </span>
+                    </header>
 
-                    <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 mb-6">
-                        <h2 className="text-lg font-bold mb-4">Quick Record</h2>
-                        <div className="space-y-6">
-                            {Object.entries(habitConfigs).map(([key, config]) => (
-                                <div key={key}>
-                                    <p className="text-sm font-medium mb-2">{config.label}</p>
-                                    <div className="flex gap-2">
-                                        {[2, 4, 6, 8].map(num => (
-                                            <button 
-                                                key={num}
-                                                onClick={() => setDailyData(prev => ({ ...prev, [key]: prev[key] + num }))}
-                                                className={`flex-1 py-2 rounded-xl text-sm font-bold shadow-sm border transition-all active:scale-95 ${config.color} text-white`}
-                                            >
-                                                +{num}
-                                            </button>
-                                        ))}
-                                    </div>
-                                    <p className="text-right text-xs mt-1 text-slate-400">現在: {dailyData[key]}{config.unit}</p>
-                                </div>
-                            ))}
-                        </div>
-                        <button 
-                            onClick={handleSave}
-                            className="w-full mt-8 bg-slate-800 text-white py-4 rounded-2xl font-bold text-lg shadow-lg active:scale-95 transition-transform"
-                        >
-                            今日の記録を保存する
+                    <div className="space-y-4 mb-6">
+                        <InputCard id="greenEx" label="グリーンEX" icon="tree-pine" color="text-emerald-500" unit="分" />
+                        <InputCard id="meditation" label="瞑想" icon="flower-2" color="text-purple-500" unit="分" />
+                        <InputCard id="pages" label="読書" icon="book-open" color="text-orange-500" unit="頁" />
+                        <InputCard id="hiit" label="HIIT" icon="zap" color="text-red-500" unit="分" />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 mb-6">
+                        <button onClick={() => toggleAction('coldWater')} className={`p-4 rounded-3xl border flex flex-col items-center gap-2 transition-all ${totals['coldWater']?.today ? 'bg-blue-500 text-white border-blue-600 shadow-lg' : 'bg-white text-blue-500 border-slate-100'}`}>
+                            <Icon name="droplets" size={24} /> <span className="text-xs font-black">冷水シャワー</span>
+                        </button>
+                        <button onClick={() => toggleAction('bento')} className={`p-4 rounded-3xl border flex flex-col items-center gap-2 transition-all ${totals['bento']?.today ? 'bg-amber-500 text-white border-amber-600 shadow-lg' : 'bg-white text-amber-500 border-slate-100'}`}>
+                            <Icon name="box" size={24} /> <span className="text-xs font-black">お弁当作成</span>
                         </button>
                     </div>
 
-                    <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
-                        <h2 className="text-lg font-bold mb-4">Monthly Best</h2>
-                        <div className="grid grid-cols-2 gap-4">
-                            {Object.entries(habitConfigs).map(([key, config]) => (
-                                <div key={key} className="bg-slate-50 p-3 rounded-2xl text-center">
-                                    <p className="text-xs text-slate-500">{config.label}</p>
-                                    <p className="text-xl font-black text-slate-800">{personalBests[key] || 0}<span className="text-xs ml-1 font-normal">{config.unit}</span></p>
+                    <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 mb-6">
+                        <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">修正用ログ</h2>
+                        <div className="space-y-2">
+                            {history.filter(e => e.date === today).reverse().map(entry => (
+                                <div key={entry.id} className="flex justify-between items-center p-2 bg-slate-50 rounded-xl">
+                                    <span className="text-[10px] font-black text-slate-400 uppercase">{entry.key}</span>
+                                    <div className="flex items-center gap-3">
+                                        <span className="font-bold text-sm">+{entry.value}</span>
+                                        <button onClick={() => deleteEntry(entry.id)} className="text-slate-300 hover:text-red-500"><Icon name="trash-2" size={14} /></button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="bg-slate-900 text-white rounded-[2rem] p-6 shadow-xl">
+                        <h2 className="text-xs font-bold text-indigo-300 mb-4 flex items-center gap-2"><Icon name="bar-chart-3" size={14}/> 月間達成度</h2>
+                        <div className="space-y-4">
+                            {['greenEx', 'pages', 'hiit'].map(key => (
+                                <div key={key} className="space-y-1">
+                                    <div className="flex justify-between text-[10px] font-bold uppercase text-slate-500">
+                                        <span>{key}</span>
+                                        <span className="text-indigo-200 text-[8px]">Best: {personalBests[key] || 0}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="flex-1 h-1 bg-slate-800 rounded-full overflow-hidden">
+                                            <div className="h-full bg-indigo-400" style={{ width: `${Math.min(100, ((totals[key]?.month || 0) / (personalBests[key] || 1)) * 100)}%` }}></div>
+                                        </div>
+                                        <span className="text-xs font-bold w-8 text-right">{totals[key]?.month || 0}</span>
+                                    </div>
                                 </div>
                             ))}
                         </div>
@@ -131,7 +165,6 @@
             );
         };
 
-        // 3. 画面に表示させる命令
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<HabitTracker />);
     </script>
