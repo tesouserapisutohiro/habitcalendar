@@ -3,31 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Habit Vibe 6.5.3</title>
+    <title>Habit Vibe 6.6</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        body { -webkit-tap-highlight-color: transparent; }
+        body { -webkit-tap-highlight-color: transparent; font-family: sans-serif; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
-        .img-placeholder { background-color: rgba(255,255,255,0.3); }
+        input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-800 font-sans">
+<body class="bg-slate-50 text-slate-800">
     <div id="root"></div>
 
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
 
-        // アイコン表示用コンポーネント
         const Icon = ({ name, size = 18, className = "" }) => {
             useEffect(() => { if (window.lucide) lucide.createIcons(); }, []);
             return <i data-lucide={name} className={className} style={{ width: size, height: size }}></i>;
         };
 
-        // 猫のイメージ画像
         const CAT_IMAGES = {
             silver: "https://images.unsplash.com/photo-1513245543132-31f507417b26?auto=format&fit=crop&q=80&w=200&h=200",
             orange: "https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?auto=format&fit=crop&q=80&w=200&h=200"
@@ -44,10 +42,7 @@
 
             useEffect(() => {
                 const saved = localStorage.getItem('habit-v6-direct');
-                if (saved) {
-                    setHistory(JSON.parse(saved));
-                    setLastSaved("同期完了");
-                }
+                if (saved) { setHistory(JSON.parse(saved)); setLastSaved("同期完了"); }
             }, []);
 
             const updateStorage = (newHistory) => {
@@ -96,150 +91,157 @@
                 return bests;
             }, [history]);
 
-            const weeklyStats = useMemo(() => {
-                const days = [...Array(7)].map((_, i) => {
-                    const d = new Date(); d.setDate(d.getDate() - i);
-                    return d.toLocaleDateString('sv-SE');
-                }).reverse();
-                return days.map(date => ({
-                    date: date.slice(5),
-                    total: history.filter(e => e.date === date && typeof e.value === 'number').reduce((acc, curr) => acc + curr.value, 0)
-                }));
-            }, [history]);
-
             const catData = useMemo(() => {
                 const data = [
-                  { name: "シウ (サバトラ)", type: "silver", msg: "hiroさん、瞑想で心もリフレッシュだね！" },
-                  { name: "ケン (茶トラ)", type: "orange", msg: "瞑想してると、ボクも眠くなっちゃうニャ〜" },
-                  { name: "シウ (サバトラ)", type: "silver", msg: "今日の料理、ケンと一緒に楽しみにしてるよ！" },
-                  { name: "ケン (茶トラ)", type: "orange", msg: "ミッション達成！hiroさんはすごいニャ！" }
+                  { name: "シウ (サバトラ)", type: "silver", msg: "hiroさん、一気に入力できて楽になったニャ！" },
+                  { name: "ケン (茶トラ)", type: "orange", msg: "20分も一瞬だニャ！今日も頑張ってるニャ！" },
+                  { name: "シウ (サバトラ)", type: "silver", msg: "料理の回数も、パパッと記録しちゃおうニャ！" },
+                  { name: "ケン (茶トラ)", type: "orange", msg: "hiroさんのバイブス、最高潮だニャ〜！" }
                 ];
                 return data[Math.floor(Math.random() * data.length)];
             }, [todayTotals]);
 
-            const InputCard = ({ id, label, icon, color, unit }) => (
-                <div className="p-4 rounded-3xl bg-white border border-slate-100 shadow-sm space-y-3">
-                    <div className="flex items-center justify-between font-bold text-slate-500">
-                        <div className="flex items-center gap-2">
+            const InputCard = ({ id, label, icon, color, unit, presets = [] }) => (
+                <div className="p-4 rounded-[2rem] bg-white border border-slate-100 shadow-sm space-y-3">
+                    <div className="flex items-center justify-between px-1">
+                        <div className="flex items-center gap-2 font-bold text-slate-600">
                             <Icon name={icon} className={color} />
                             <span className="text-sm">{label}</span>
                         </div>
-                        <div className="text-right text-xs">
-                            <span className="text-lg font-black text-slate-700">{(todayTotals[id] || 0)}</span>
-                            <span className="text-[10px] text-slate-400 ml-0.5">{unit}</span>
+                        <div className="text-right">
+                            <span className="text-xl font-black text-slate-800">{(todayTotals[id] || 0)}</span>
+                            <span className="text-[10px] text-slate-400 ml-1 uppercase">{unit}</span>
                         </div>
                     </div>
+                    
                     <div className="flex gap-2">
-                        <input type="number" inputMode="numeric" placeholder={`${unit}を入力`} value={inputValues[id]}
+                        <input type="number" inputMode="numeric" placeholder="数字を入力" value={inputValues[id]}
                             onChange={(e) => setInputValues({...inputValues, [id]: e.target.value})}
-                            className="flex-1 bg-slate-50 border-none rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                            className="flex-1 bg-slate-50 border-none rounded-2xl px-4 py-3 text-lg font-bold outline-none focus:ring-2 focus:ring-indigo-500"
                         />
-                        <button onClick={() => addItem(id, inputValues[id])} className="bg-indigo-600 text-white p-2 rounded-xl shadow-md active:scale-90 transition-transform">
-                            <Icon name="plus" />
+                        <button onClick={() => addItem(id, inputValues[id])} className="bg-indigo-600 text-white px-5 rounded-2xl shadow-md active:scale-95 transition-transform">
+                            <Icon name="plus" size={24} />
                         </button>
+                    </div>
+
+                    {/* クイック入力ボタン（これが一気に入力する秘密です） */}
+                    <div className="flex gap-2 pt-1 overflow-x-auto no-scrollbar">
+                        {presets.map(val => (
+                            <button key={val} onClick={() => addItem(id, val)} className="bg-slate-100 text-slate-600 text-[11px] font-bold px-4 py-2 rounded-xl active:bg-slate-200 shrink-0">
+                                +{val}{unit}
+                            </button>
+                        ))}
                     </div>
                 </div>
             );
 
             return (
-                <div className="max-w-md mx-auto p-4 pb-24 font-sans">
+                <div className="max-w-md mx-auto p-4 pb-24">
                     <header className="flex justify-between items-center mb-4 px-1">
                         <div>
-                          <h1 className="text-2xl font-black text-indigo-600 italic">Habit Vibe 6.5.3</h1>
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-bold text-emerald-500 flex items-center gap-1">
+                          <h1 className="text-2xl font-black text-indigo-600 italic leading-none">Habit Vibe 6.6</h1>
+                          <span className="text-[10px] font-bold text-emerald-500 flex items-center gap-1 mt-1">
                                 <Icon name="check-circle" size={10} /> {lastSaved}
-                            </span>
-                          </div>
+                          </span>
                         </div>
                         <div className="flex gap-2 bg-white p-1 rounded-2xl shadow-sm border border-slate-100">
-                          <button onClick={() => setActiveTab('input')} className={`p-2 rounded-xl transition-all ${activeTab === 'input' ? 'bg-indigo-600 text-white' : 'text-slate-400'}`}>
-                            <Icon name="edit-3" size={16} />
+                          <button onClick={() => setActiveTab('input')} className={`p-2.5 rounded-xl transition-all ${activeTab === 'input' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400'}`}>
+                            <Icon name="edit-3" size={18} />
                           </button>
-                          <button onClick={() => setActiveTab('stats')} className={`p-2 rounded-xl transition-all ${activeTab === 'stats' ? 'bg-indigo-600 text-white' : 'text-slate-400'}`}>
-                            <Icon name="bar-chart-2" size={16} />
+                          <button onClick={() => setActiveTab('stats')} className={`p-2.5 rounded-xl transition-all ${activeTab === 'stats' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400'}`}>
+                            <Icon name="bar-chart-2" size={18} />
                           </button>
                         </div>
                     </header>
 
-                    <div className={`bg-gradient-to-r rounded-[2rem] p-5 mb-6 text-white shadow-lg relative overflow-hidden transition-all ${catData.type === 'silver' ? 'from-slate-500 to-slate-700' : 'from-orange-400 to-amber-500'}`}>
+                    <div className={`bg-gradient-to-r rounded-[2.5rem] p-5 mb-6 text-white shadow-lg relative overflow-hidden transition-all ${catData.type === 'silver' ? 'from-slate-500 to-slate-700' : 'from-orange-400 to-amber-500'}`}>
                       <div className="relative z-10 flex items-center gap-4">
-                        <div className="w-14 h-14 rounded-full border-2 border-white/50 overflow-hidden shadow-sm img-placeholder">
+                        <div className="w-14 h-14 rounded-full border-2 border-white/40 overflow-hidden shadow-inner bg-white/20">
                             <img src={CAT_IMAGES[catData.type]} className="w-full h-full object-cover" alt="cat" />
                         </div>
-                        <div>
-                          <p className="text-[10px] font-bold opacity-80 uppercase tracking-widest tracking-[0.1em]">{catData.name}</p>
-                          <p className="font-bold text-sm italic leading-relaxed">「{catData.msg}」</p>
+                        <div className="flex-1">
+                          <p className="text-[10px] font-bold opacity-80 uppercase tracking-[0.1em] mb-0.5">{catData.name}</p>
+                          <p className="font-bold text-sm italic leading-snug">「{catData.msg}」</p>
                         </div>
                       </div>
                     </div>
 
                     {activeTab === 'input' ? (
                       <div className="space-y-4 animate-in fade-in duration-500">
-                        <div className="p-4 rounded-3xl bg-indigo-50 border border-indigo-100 space-y-3">
-                            <div className="flex items-center gap-2 font-bold text-indigo-600 text-xs">
-                                <Icon name="flag" size={14} /> 今日のミッション達成！
+                        {/* 今日のミッション */}
+                        <div className="p-5 rounded-[2rem] bg-indigo-50 border border-indigo-100 space-y-3">
+                            <div className="flex items-center gap-2 font-bold text-indigo-600 text-xs uppercase tracking-widest">
+                                <Icon name="flag" size={14} /> Mission Accomplished
                             </div>
                             <div className="flex gap-2">
                                 <input type="text" placeholder="例：アプリを更新した！" value={inputValues.mission}
                                     onChange={(e) => setInputValues({...inputValues, mission: e.target.value})}
-                                    className="flex-1 bg-white border-none rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                                    className="flex-1 bg-white border-none rounded-2xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
                                 />
-                                <button onClick={() => addItem('mission', inputValues.mission)} className="bg-indigo-600 text-white p-2 rounded-xl shadow-md"><Icon name="send" /></button>
+                                <button onClick={() => addItem('mission', inputValues.mission)} className="bg-indigo-600 text-white p-3 rounded-2xl shadow-md"><Icon name="send" /></button>
                             </div>
                             <div className="flex flex-wrap gap-2">
                                 {history.filter(e => e.date === today && e.key === 'mission').map(m => (
-                                    <div key={m.id} className="bg-white px-3 py-1 rounded-full text-[10px] font-bold text-indigo-600 shadow-sm flex items-center gap-1">
+                                    <div key={m.id} className="bg-white px-3 py-1.5 rounded-full text-[10px] font-bold text-indigo-600 shadow-sm flex items-center gap-2">
                                         <span>{m.value}</span>
-                                        <button onClick={() => deleteEntry(m.id)}><Icon name="x" size={10} /></button>
+                                        <button onClick={() => deleteEntry(m.id)} className="text-indigo-200 hover:text-red-400"><Icon name="x" size={12} /></button>
                                     </div>
                                 ))}
                             </div>
                         </div>
-                        
-                        <InputCard id="cooking" label="料理" icon="utensils" color="text-rose-500" unit="回" />
-                        <InputCard id="greenEx" label="グリーンEX" icon="tree-pine" color="text-emerald-500" unit="分" />
-                        <InputCard id="meditation" label="瞑想" icon="flower-2" color="text-purple-500" unit="分" />
-                        <InputCard id="pages" label="読書" icon="book-open" color="text-orange-500" unit="頁" />
-                        <InputCard id="hiit" label="HIIT" icon="zap" color="text-red-500" unit="分" />
+
+                        <InputCard id="cooking" label="料理" icon="utensils" color="text-rose-500" unit="回" presets={[1, 2, 3]} />
+                        <InputCard id="greenEx" label="グリーンEX" icon="tree-pine" color="text-emerald-500" unit="分" presets={[10, 15, 20, 30]} />
+                        <InputCard id="meditation" label="瞑想" icon="flower-2" color="text-purple-500" unit="分" presets={[5, 10, 20, 30]} />
+                        <InputCard id="pages" label="読書" icon="book-open" color="text-orange-500" unit="頁" presets={[10, 20, 50, 100]} />
+                        <InputCard id="hiit" label="HIIT" icon="zap" color="text-red-500" unit="分" presets={[4, 8, 12, 16]} />
 
                         <div className="grid grid-cols-2 gap-4">
-                            <button onClick={() => toggleAction('coldWater')} className={`p-4 rounded-3xl border flex flex-col items-center gap-2 transition-all ${todayTotals['coldWater'] ? 'bg-blue-500 text-white shadow-lg border-blue-600' : 'bg-white text-blue-500 border-slate-100'}`}>
-                                <Icon name="droplets" size={24} /> <span className="text-xs font-black">冷水</span>
+                            <button onClick={() => toggleAction('coldWater')} className={`p-5 rounded-[2rem] border flex flex-col items-center gap-2 transition-all ${todayTotals['coldWater'] ? 'bg-blue-500 text-white shadow-lg border-blue-600' : 'bg-white text-blue-500 border-slate-100 shadow-sm'}`}>
+                                <Icon name="droplets" size={24} /> <span className="text-[10px] font-black uppercase">Cold Shower</span>
                             </button>
-                            <button onClick={() => toggleAction('bento')} className={`p-4 rounded-3xl border flex flex-col items-center gap-2 transition-all ${todayTotals['bento'] ? 'bg-amber-500 text-white shadow-lg border-amber-600' : 'bg-white text-amber-500 border-slate-100'}`}>
-                                <Icon name="box" size={24} /> <span className="text-xs font-black">お弁当</span>
+                            <button onClick={() => toggleAction('bento')} className={`p-5 rounded-[2rem] border flex flex-col items-center gap-2 transition-all ${todayTotals['bento'] ? 'bg-amber-500 text-white shadow-lg border-amber-600' : 'bg-white text-amber-500 border-slate-100 shadow-sm'}`}>
+                                <Icon name="box" size={24} /> <span className="text-[10px] font-black uppercase">Bento Done</span>
                             </button>
+                        </div>
+                        
+                        <div className="p-5 text-[10px] text-slate-300 italic text-center uppercase tracking-[0.2em]">
+                           Swipe to see stats
                         </div>
                       </div>
                     ) : (
                       <div className="space-y-6 animate-in slide-in-from-right duration-500">
-                        <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100">
-                          <h2 className="text-xs font-bold text-slate-400 mb-6 uppercase tracking-widest">過去7日間の活動</h2>
-                          <div className="h-32 flex items-end gap-2 px-1">
-                            {weeklyStats.map((day, i) => {
-                              const maxTotal = Math.max(...weeklyStats.map(d => d.total), 1);
-                              return (
-                                <div key={i} className="flex-1 flex flex-col items-center gap-2">
-                                  <div className="w-full bg-slate-100 rounded-t-lg relative flex items-end overflow-hidden h-full">
-                                    <div className="w-full bg-indigo-500 transition-all duration-1000" style={{ height: `${(day.total / maxTotal) * 100}%` }}></div>
-                                  </div>
-                                  <span className="text-[8px] font-bold text-slate-400">{day.date}</span>
-                                </div>
-                              );
+                        <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-100">
+                          <h2 className="text-xs font-bold text-slate-400 mb-8 uppercase tracking-[0.2em] flex items-center gap-2">
+                             <Icon name="activity" size={14}/> Weekly Activity
+                          </h2>
+                          <div className="h-40 flex items-end gap-3 px-1">
+                            {[...Array(7)].map((_, i) => {
+                                const d = new Date(); d.setDate(d.getDate() - (6-i));
+                                const dateStr = d.toLocaleDateString('sv-SE');
+                                const total = history.filter(e => e.date === dateStr && typeof e.value === 'number').reduce((acc, curr) => acc + curr.value, 0);
+                                return (
+                                    <div key={i} className="flex-1 flex flex-col items-center gap-3">
+                                        <div className="w-full bg-slate-50 rounded-full relative flex items-end overflow-hidden h-full">
+                                            <div className="w-full bg-indigo-500/80 transition-all duration-1000 rounded-full" style={{ height: `${Math.min(100, (total / 100) * 100)}%` }}></div>
+                                        </div>
+                                        <span className="text-[8px] font-bold text-slate-400">{dateStr.slice(8)}</span>
+                                    </div>
+                                );
                             })}
                           </div>
                         </div>
-                        <div className="bg-slate-900 rounded-[2rem] p-6 text-white shadow-xl">
-                          <h2 className="text-xs font-bold text-indigo-300 mb-6 uppercase tracking-widest">月間レポート</h2>
+                        
+                        <div className="bg-slate-900 rounded-[2.5rem] p-8 text-white shadow-xl">
+                          <h2 className="text-xs font-bold text-indigo-300 mb-8 uppercase tracking-[0.2em]">Monthly Performance</h2>
                           {['cooking', 'greenEx', 'meditation', 'pages', 'hiit'].map(key => (
-                            <div key={key} className="mb-4 space-y-1">
-                              <div className="flex justify-between text-[10px] font-bold">
-                                <span className="text-slate-400 uppercase">{key}</span>
-                                <span className="text-indigo-200">{monthTotals[key] || 0} / Best: {personalBests[key] || 0}</span>
+                            <div key={key} className="mb-6 space-y-2">
+                              <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                                <span>{key}</span>
+                                <span className="text-indigo-200">{monthTotals[key] || 0} / BEST: {personalBests[key] || 0}</span>
                               </div>
-                              <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
-                                <div className="h-full bg-indigo-400" style={{ width: `${personalBests[key] > 0 ? Math.min(100, ((monthTotals[key] || 0) / personalBests[key]) * 100) : 0}%` }}></div>
+                              <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                                <div className="h-full bg-indigo-400 transition-all duration-1000" style={{ width: `${personalBests[key] > 0 ? Math.min(100, ((monthTotals[key] || 0) / personalBests[key]) * 100) : 0}%` }}></div>
                               </div>
                             </div>
                           ))}
