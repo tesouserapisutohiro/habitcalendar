@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Habit Vibe 6.6</title>
+    <title>Habit Vibe 6.7</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -93,10 +93,10 @@
 
             const catData = useMemo(() => {
                 const data = [
-                  { name: "シウ (サバトラ)", type: "silver", msg: "hiroさん、一気に入力できて楽になったニャ！" },
-                  { name: "ケン (茶トラ)", type: "orange", msg: "20分も一瞬だニャ！今日も頑張ってるニャ！" },
-                  { name: "シウ (サバトラ)", type: "silver", msg: "料理の回数も、パパッと記録しちゃおうニャ！" },
-                  { name: "ケン (茶トラ)", type: "orange", msg: "hiroさんのバイブス、最高潮だニャ〜！" }
+                  { name: "シウ (サバトラ)", type: "silver", msg: "hiroさん、日本語になって見やすくなったニャ！" },
+                  { name: "ケン (茶トラ)", type: "orange", msg: "削除ボタンも復活したニャ！安心して入力するニャ！" },
+                  { name: "シウ (サバトラ)", type: "silver", msg: "今日のミッション、ボクも応援してるニャ！" },
+                  { name: "ケン (茶トラ)", type: "orange", msg: "和歌山での習慣、今日もバッチリだニャ〜！" }
                 ];
                 return data[Math.floor(Math.random() * data.length)];
             }, [todayTotals]);
@@ -124,7 +124,6 @@
                         </button>
                     </div>
 
-                    {/* クイック入力ボタン（これが一気に入力する秘密です） */}
                     <div className="flex gap-2 pt-1 overflow-x-auto no-scrollbar">
                         {presets.map(val => (
                             <button key={val} onClick={() => addItem(id, val)} className="bg-slate-100 text-slate-600 text-[11px] font-bold px-4 py-2 rounded-xl active:bg-slate-200 shrink-0">
@@ -139,7 +138,7 @@
                 <div className="max-w-md mx-auto p-4 pb-24">
                     <header className="flex justify-between items-center mb-4 px-1">
                         <div>
-                          <h1 className="text-2xl font-black text-indigo-600 italic leading-none">Habit Vibe 6.6</h1>
+                          <h1 className="text-2xl font-black text-indigo-600 italic leading-none">Habit Vibe 6.7</h1>
                           <span className="text-[10px] font-bold text-emerald-500 flex items-center gap-1 mt-1">
                                 <Icon name="check-circle" size={10} /> {lastSaved}
                           </span>
@@ -161,7 +160,7 @@
                         </div>
                         <div className="flex-1">
                           <p className="text-[10px] font-bold opacity-80 uppercase tracking-[0.1em] mb-0.5">{catData.name}</p>
-                          <p className="font-bold text-sm italic leading-snug">「{catData.msg}」</p>
+                          <p className="font-bold text-sm italic leading-relaxed">「{catData.msg}」</p>
                         </div>
                       </div>
                     </div>
@@ -171,7 +170,7 @@
                         {/* 今日のミッション */}
                         <div className="p-5 rounded-[2rem] bg-indigo-50 border border-indigo-100 space-y-3">
                             <div className="flex items-center gap-2 font-bold text-indigo-600 text-xs uppercase tracking-widest">
-                                <Icon name="flag" size={14} /> Mission Accomplished
+                                <Icon name="flag" size={14} /> 今日のミッション達成
                             </div>
                             <div className="flex gap-2">
                                 <input type="text" placeholder="例：アプリを更新した！" value={inputValues.mission}
@@ -185,75 +184,3 @@
                                     <div key={m.id} className="bg-white px-3 py-1.5 rounded-full text-[10px] font-bold text-indigo-600 shadow-sm flex items-center gap-2">
                                         <span>{m.value}</span>
                                         <button onClick={() => deleteEntry(m.id)} className="text-indigo-200 hover:text-red-400"><Icon name="x" size={12} /></button>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        <InputCard id="cooking" label="料理" icon="utensils" color="text-rose-500" unit="回" presets={[1, 2, 3]} />
-                        <InputCard id="greenEx" label="グリーンEX" icon="tree-pine" color="text-emerald-500" unit="分" presets={[10, 15, 20, 30]} />
-                        <InputCard id="meditation" label="瞑想" icon="flower-2" color="text-purple-500" unit="分" presets={[5, 10, 20, 30]} />
-                        <InputCard id="pages" label="読書" icon="book-open" color="text-orange-500" unit="頁" presets={[10, 20, 50, 100]} />
-                        <InputCard id="hiit" label="HIIT" icon="zap" color="text-red-500" unit="分" presets={[4, 8, 12, 16]} />
-
-                        <div className="grid grid-cols-2 gap-4">
-                            <button onClick={() => toggleAction('coldWater')} className={`p-5 rounded-[2rem] border flex flex-col items-center gap-2 transition-all ${todayTotals['coldWater'] ? 'bg-blue-500 text-white shadow-lg border-blue-600' : 'bg-white text-blue-500 border-slate-100 shadow-sm'}`}>
-                                <Icon name="droplets" size={24} /> <span className="text-[10px] font-black uppercase">Cold Shower</span>
-                            </button>
-                            <button onClick={() => toggleAction('bento')} className={`p-5 rounded-[2rem] border flex flex-col items-center gap-2 transition-all ${todayTotals['bento'] ? 'bg-amber-500 text-white shadow-lg border-amber-600' : 'bg-white text-amber-500 border-slate-100 shadow-sm'}`}>
-                                <Icon name="box" size={24} /> <span className="text-[10px] font-black uppercase">Bento Done</span>
-                            </button>
-                        </div>
-                        
-                        <div className="p-5 text-[10px] text-slate-300 italic text-center uppercase tracking-[0.2em]">
-                           Swipe to see stats
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="space-y-6 animate-in slide-in-from-right duration-500">
-                        <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-100">
-                          <h2 className="text-xs font-bold text-slate-400 mb-8 uppercase tracking-[0.2em] flex items-center gap-2">
-                             <Icon name="activity" size={14}/> Weekly Activity
-                          </h2>
-                          <div className="h-40 flex items-end gap-3 px-1">
-                            {[...Array(7)].map((_, i) => {
-                                const d = new Date(); d.setDate(d.getDate() - (6-i));
-                                const dateStr = d.toLocaleDateString('sv-SE');
-                                const total = history.filter(e => e.date === dateStr && typeof e.value === 'number').reduce((acc, curr) => acc + curr.value, 0);
-                                return (
-                                    <div key={i} className="flex-1 flex flex-col items-center gap-3">
-                                        <div className="w-full bg-slate-50 rounded-full relative flex items-end overflow-hidden h-full">
-                                            <div className="w-full bg-indigo-500/80 transition-all duration-1000 rounded-full" style={{ height: `${Math.min(100, (total / 100) * 100)}%` }}></div>
-                                        </div>
-                                        <span className="text-[8px] font-bold text-slate-400">{dateStr.slice(8)}</span>
-                                    </div>
-                                );
-                            })}
-                          </div>
-                        </div>
-                        
-                        <div className="bg-slate-900 rounded-[2.5rem] p-8 text-white shadow-xl">
-                          <h2 className="text-xs font-bold text-indigo-300 mb-8 uppercase tracking-[0.2em]">Monthly Performance</h2>
-                          {['cooking', 'greenEx', 'meditation', 'pages', 'hiit'].map(key => (
-                            <div key={key} className="mb-6 space-y-2">
-                              <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-slate-500">
-                                <span>{key}</span>
-                                <span className="text-indigo-200">{monthTotals[key] || 0} / BEST: {personalBests[key] || 0}</span>
-                              </div>
-                              <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                                <div className="h-full bg-indigo-400 transition-all duration-1000" style={{ width: `${personalBests[key] > 0 ? Math.min(100, ((monthTotals[key] || 0) / personalBests[key]) * 100) : 0}%` }}></div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                </div>
-            );
-        };
-
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<HabitTracker />);
-    </script>
-</body>
-</html>
