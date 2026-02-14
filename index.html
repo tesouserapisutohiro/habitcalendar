@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Habit Vibe 8.4</title>
+    <title>Habit Vibe 8.5</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin></script>
@@ -20,18 +20,24 @@
 </head>
 <body>
     <div id="root">
-        <div style="display: flex; align-items: center; justify-content: center; min-height: 100vh; color: #94a3b8; font-size: 14px;">
-            Vibe Coding 起動を試みています...
+        <div id="loading-screen" style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; color: #94a3b8; font-size: 14px;">
+            <p>Vibe Coding 起動中...</p>
+            <p style="font-size: 10px; margin-top: 10px; opacity: 0.5;">(数秒経っても動かない場合は再読み込みしてください)</p>
         </div>
     </div>
 
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
 
-        // アイコンコンポーネント（超軽量版）
-        const Icon = ({ name, size = 18, className = "" }) => (
-            <i data-lucide={name} className={className} style={{ width: size, height: size, display: 'inline-block' }}></i>
-        );
+        // アイコンコンポーネント（エラー回避型）
+        const Icon = ({ name, size = 18, className = "" }) => {
+            useEffect(() => {
+                if (window.lucide) {
+                    try { window.lucide.createIcons(); } catch(e) {}
+                }
+            }, [name]);
+            return <i data-lucide={name} className={className} style={{ width: size, height: size, display: 'inline-block' }}></i>;
+        };
 
         const CAT_IMAGES = {
             silver: "https://images.unsplash.com/photo-1513245543132-31f507417b26?auto=format&fit=crop&q=80&w=200&h=200",
@@ -42,33 +48,30 @@
             const [history, setHistory] = useState([]);
             const [inputValues, setInputValues] = useState({ hiit: "", greenEx: "", meditation: "", centering: "", pages: "", cooking: "", mission: "", meal: "" });
             const [activeTab, setActiveTab] = useState('input');
-            const [lastSaved, setLastSaved] = useState("待機中");
+            const [lastSaved, setLastSaved] = useState("");
             
             const todayStr = new Date().toLocaleDateString('sv-SE');
             const [targetDate, setTargetDate] = useState(todayStr);
-
             const WEEKLY_GOAL = 500;
 
-            // 初期化
+            // データ読み込みと修復
             useEffect(() => {
                 try {
                     const saved = localStorage.getItem('habit-v6-direct');
                     if (saved) {
                         const parsed = JSON.parse(saved);
-                        if (Array.isArray(parsed)) setHistory(parsed);
+                        if (Array.isArray(parsed)) {
+                            setHistory(parsed);
+                        } else {
+                            setHistory([]);
+                        }
                     }
                     setLastSaved("同期完了");
                 } catch (e) {
-                    console.error("Data Load Error");
+                    console.error("Data Restore needed");
+                    setHistory([]);
                 }
-                // アイコンの初期化
-                if (window.lucide) window.lucide.createIcons();
             }, []);
-
-            // アイコンの更新監視
-            useEffect(() => {
-                if (window.lucide) window.lucide.createIcons();
-            });
 
             const playMeow = () => {
                 try {
@@ -86,13 +89,15 @@
             };
 
             const updateStorage = (newHistory) => {
-                setHistory(newHistory);
-                localStorage.setItem('habit-v6-direct', JSON.stringify(newHistory));
-                setLastSaved(`保存済: ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`);
+                try {
+                    setHistory(newHistory);
+                    localStorage.setItem('habit-v6-direct', JSON.stringify(newHistory));
+                    setLastSaved(`保存済: ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`);
+                } catch(e) {}
             };
 
             const addItem = (key, value) => {
-                if (!value || value.toString().trim() === "") return;
+                if (value === undefined || value === null || value.toString().trim() === "") return;
                 
                 let entryValue;
                 if (key === 'mission' || key === 'meal') {
@@ -123,14 +128,14 @@
                 entry ? deleteEntry(entry.id) : addItem(key, 1);
             };
 
-            // 週間ポイント集計（HIIT:20x, 料理:30x, 冷水/弁当:10pt）
+            // 週間ポイント（HIIT:20x, 料理:30x, 冷水/弁当:10pt）
             const weeklyPoints = useMemo(() => {
                 const limit = new Date();
                 limit.setDate(limit.getDate() - 7);
                 const limitStr = limit.toLocaleDateString('sv-SE');
                 
-                return history
-                    .filter(e => e.date >= limitStr && typeof e.value === 'number')
+                return (history || [])
+                    .filter(e => e && e.date >= limitStr && typeof e.value === 'number')
                     .reduce((acc, curr) => {
                         let weight = 1;
                         if (curr.key === 'hiit') weight = 20;
@@ -147,63 +152,105 @@
                 const limit = new Date();
                 limit.setDate(limit.getDate() - 7);
                 const limitStr = limit.toLocaleDateString('sv-SE');
-                const dishes = history.filter(e => e.date >= limitStr && e.key === 'meal');
+                const dishes = history.filter(e => e && e.date >= limitStr && e.key === 'meal');
                 return dishes.length > 0 ? dishes[dishes.length - 1].value : null;
             }, [history]);
 
-            // 選択日の合計
+            // 日別合計
             const selectedDayTotals = useMemo(() => {
                 const res = {};
-                history.filter(e => e.date === targetDate).forEach(e => {
+                (history || []).filter(e => e && e.date === targetDate).forEach(e => {
                     if (typeof e.value === 'number') res[e.key] = (res[e.key] || 0) + e.value;
                 });
                 return res;
             }, [history, targetDate]);
 
-            // 猫メッセージ
             const catData = useMemo(() => {
                 const isPast = targetDate < todayStr;
-                const pool = isLuxuryMode ? [
-                    { name: "シウ", type: "silver", msg: "hiroさん、500pt達成！凄すぎて胸がいっぱいニャ…♡" },
-                    { name: "ケン", type: "orange", msg: "伝説のMaster hiro！僕たちはずっと付いていくニャ！" }
-                ] : [
-                    { name: "シウ", type: "silver", msg: isPast ? "昨日の分も埋めるなんて、誠実で素敵だニャ。" : "センタリングで自分を整えようニャ。" },
-                    { name: "ケン", type: "orange", msg: "HIITは20倍、料理は30倍！冷水と弁当も各10ptだニャ！" }
-                ];
-                return pool[Math.floor(Math.random() * pool.length)];
+                return isLuxuryMode ? 
+                    { name: "シウ", type: "silver", msg: "hiroさん、500pt達成！凄すぎて胸がいっぱいニャ…♡" } :
+                    { name: "ケン", type: "orange", msg: isPast ? "昨日の分も埋めるhiroさんは素敵ニャ！" : "HIIT(20x)と料理(30x)で爆速ポイントUPニャ！" };
             }, [targetDate, isLuxuryMode]);
 
-            const InputCard = ({ id, label, icon, color, unit, presets = [], weight = "" }) => (
-                <div className="p-5 rounded-[2.5rem] bg-white border border-slate-100 shadow-sm space-y-4 fade-in">
-                    <div className="flex items-center justify-between px-1">
-                        <div className="flex items-center gap-2 font-bold text-slate-600 text-sm">
-                            <Icon name={icon} className={color} />
-                            <span>{label} <span className="text-[9px] text-slate-300 ml-1">{weight}</span></span>
-                        </div>
-                        <div className="text-right">
-                            <span className="text-2xl font-black text-slate-800">{(selectedDayTotals[id] || 0)}</span>
-                            <span className="text-[10px] text-slate-400 ml-1 uppercase">{unit}</span>
-                        </div>
-                    </div>
-                    <div className="flex gap-2">
-                        <input type="number" inputMode="numeric" placeholder="数字を入力" value={inputValues[id] || ""}
-                            onChange={(e) => setInputValues({...inputValues, [id]: e.target.value})}
-                            onKeyDown={(e) => e.key === 'Enter' && addItem(id, inputValues[id])}
-                            className="flex-1 bg-slate-50 border-none rounded-2xl px-4 py-3 text-lg font-bold outline-none shadow-sm focus:ring-2 focus:ring-indigo-500"
-                        />
-                        <button onClick={() => addItem(id, inputValues[id])} className="bg-indigo-600 text-white px-6 rounded-2xl shadow-md active:scale-95 transition-transform"><Icon name="plus" size={24} /></button>
-                    </div>
-                    <div className="flex gap-2 pt-1 overflow-x-auto no-scrollbar">
-                        {presets.map(val => (
-                            <button key={val} onClick={() => addItem(id, val)} className="bg-slate-100 text-slate-600 text-[11px] font-bold px-4 py-2 rounded-xl active:bg-slate-200 shrink-0">+{val}{unit}</button>
-                        ))}
-                    </div>
-                </div>
-            );
-
             return (
-                <div className="max-w-md mx-auto p-4 pb-24 min-h-screen relative">
+                <div className="max-w-md mx-auto p-4 pb-24 min-h-screen fade-in">
                     <header className="flex justify-between items-center mb-4 px-1">
                         <div>
-                          <h1 className="text-2xl font-black text-indigo-600 italic leading-none">Habit Vibe 8.4</h1>
-                          <span className="text-[10px] font-bold text-emerald-5
+                          <h1 className="text-2xl font-black text-indigo-600 italic leading-none">Habit Vibe 8.5</h1>
+                          <p className="text-[10px] font-bold text-emerald-500 mt-1 uppercase tracking-widest">{lastSaved}</p>
+                        </div>
+                        <div className="flex gap-2 bg-white p-1 rounded-2xl shadow-sm border border-slate-100">
+                          <button onClick={() => setActiveTab('input')} className={`p-2.5 rounded-xl ${activeTab === 'input' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400'}`}><Icon name="edit-3" /></button>
+                          <button onClick={() => setActiveTab('stats')} className={`p-2.5 rounded-xl ${activeTab === 'stats' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400'}`}><Icon name="bar-chart-2" /></button>
+                        </div>
+                    </header>
+
+                    {/* 日付選択 */}
+                    <div className="mb-4 flex items-center gap-3 bg-white p-4 rounded-[2rem] shadow-sm border border-slate-100 text-sm">
+                        <Icon name="calendar" className="text-indigo-400" />
+                        <input type="date" value={targetDate} onChange={(e) => setTargetDate(e.target.value)} className="bg-transparent font-bold text-slate-700 outline-none w-32" />
+                        {targetDate !== todayStr && <button onClick={() => setTargetDate(todayStr)} className="ml-auto text-[10px] font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-full">今日</button>}
+                    </div>
+
+                    {/* ゲージ */}
+                    <div className="mb-6 px-1">
+                        <div className="flex justify-between items-end mb-2 text-xs">
+                            <span className="font-bold text-slate-400 uppercase">Weekly Goal</span>
+                            <span className={`font-black ${isLuxuryMode ? 'text-amber-500' : 'text-indigo-600'}`}>{weeklyPoints} / {WEEKLY_GOAL} pts</span>
+                        </div>
+                        <div className="h-2.5 bg-slate-200 rounded-full overflow-hidden shadow-inner">
+                            <div className={`h-full transition-all duration-1000 ${isLuxuryMode ? 'bg-amber-400 shadow-[0_0_15px_#fbbf24]' : 'bg-indigo-500'}`} style={{ width: `${Math.min(100, (weeklyPoints / WEEKLY_GOAL) * 100)}%` }}></div>
+                        </div>
+                    </div>
+
+                    {/* 猫エリア */}
+                    <div className={`rounded-[2.5rem] p-5 mb-6 text-white shadow-lg relative overflow-hidden transition-all duration-500 ${isLuxuryMode ? 'luxury-aura scale-[1.03]' : ''} ${catData.type === 'silver' ? 'from-slate-600 to-slate-800' : 'from-orange-400 to-amber-500'} bg-gradient-to-r`}>
+                      <div className="relative z-10 flex items-center gap-4">
+                        <img src={CAT_IMAGES[catData.type]} className="w-14 h-14 rounded-full border-2 border-white/40 object-cover bg-white/20" alt="cat" />
+                        <div className="flex-1">
+                          <p className="text-[10px] font-bold opacity-80 uppercase tracking-widest">{catData.name}</p>
+                          <p className="font-bold italic text-sm">「{catData.msg}」</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {activeTab === 'input' ? (
+                      <div className="space-y-4">
+                        {/* ミッション */}
+                        <div className="p-6 rounded-[2.5rem] bg-indigo-50 border border-indigo-100 space-y-3 shadow-sm">
+                            <div className="flex items-center gap-2 font-bold text-indigo-600 text-[10px] uppercase tracking-widest"><Icon name="flag" size={14} /> Mission</div>
+                            <div className="flex gap-2">
+                                <input type="text" placeholder="例：トレーニング完了！" value={inputValues.mission} onChange={(e) => setInputValues({...inputValues, mission: e.target.value})} onKeyDown={(e) => e.key === 'Enter' && addItem('mission', inputValues.mission)} className="flex-1 bg-white border-none rounded-2xl px-4 py-3 text-sm outline-none shadow-sm" />
+                                <button onClick={() => addItem('mission', inputValues.mission)} className="bg-indigo-600 text-white p-3 rounded-2xl shadow-md active:scale-95"><Icon name="send" /></button>
+                            </div>
+                        </div>
+
+                        {/* 絶品メニュー */}
+                        <div className="p-6 rounded-[2.5rem] bg-rose-50 border border-rose-100 space-y-3 shadow-sm">
+                            <div className="flex items-center gap-2 font-bold text-rose-600 text-[10px] uppercase tracking-widest"><Icon name="heart" size={14} /> Menu (30pt)</div>
+                            <div className="flex gap-2">
+                                <input type="text" placeholder="例：山芋の茶碗蒸し！" value={inputValues.meal} onChange={(e) => setInputValues({...inputValues, meal: e.target.value})} onKeyDown={(e) => e.key === 'Enter' && addItem('meal', inputValues.meal)} className="flex-1 bg-white border-none rounded-2xl px-4 py-3 text-sm outline-none shadow-sm" />
+                                <button onClick={() => addItem('meal', inputValues.meal)} className="bg-rose-500 text-white p-3 rounded-2xl shadow-md active:scale-95"><Icon name="utensils" /></button>
+                            </div>
+                        </div>
+
+                        <InputCard id="hiit" label="HIIT" icon="zap" color="text-red-500" unit="分" presets={[4, 8, 12]} weight="x20pt" />
+                        <InputCard id="cooking" label="料理記録" icon="chef-hat" color="text-rose-500" unit="回" presets={[1, 2, 3]} weight="x30pt" />
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                            <button onClick={() => toggleAction('coldWater')} className={`p-5 rounded-[2.5rem] border flex flex-col items-center gap-2 transition-all shadow-sm ${selectedDayTotals['coldWater'] ? 'bg-blue-500 text-white border-blue-600 shadow-lg' : 'bg-white text-blue-500 border-slate-100'}`}>
+                                <Icon name="droplets" size={24} />
+                                <span className="text-[9px] font-black uppercase tracking-tighter">冷水 (10pt)</span>
+                            </button>
+                            <button onClick={() => toggleAction('bento')} className={`p-5 rounded-[2.5rem] border flex flex-col items-center gap-2 transition-all shadow-sm ${selectedDayTotals['bento'] ? 'bg-amber-500 text-white border-amber-600 shadow-lg' : 'bg-white text-amber-500 border-slate-100'}`}>
+                                <Icon name="box" size={24} />
+                                <span className="text-[9px] font-black uppercase tracking-tighter">弁当 (10pt)</span>
+                            </button>
+                        </div>
+
+                        <InputCard id="centering" label="センタリング" icon="compass" color="text-blue-500" unit="分" presets={[10, 20, 30]} />
+                        <InputCard id="greenEx" label="グリーンEX" icon="tree-pine" color="text-emerald-500" unit="分" presets={[10, 20, 30]} />
+                        <InputCard id="meditation" label="瞑想" icon="flower-2" color="text-purple-500" unit="分" presets={[10, 20, 30]} />
+                        <InputCard id="pages" label="読書" icon="book-open" color="text-orange-500" unit="頁" presets={[20, 50, 100]} />
+
+                        <div
