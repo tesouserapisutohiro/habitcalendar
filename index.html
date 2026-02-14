@@ -3,14 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Habit Vibe 8.3 (Stable)</title>
+    <title>Habit Vibe 9.0 Standalone</title>
+    
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
+
     <style>
-        body { -webkit-tap-highlight-color: transparent; font-family: sans-serif; overflow-x: hidden; }
+        body { -webkit-tap-highlight-color: transparent; font-family: sans-serif; overflow-x: hidden; background-color: #f8fafc; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
         .fade-in { animation: fadeIn 0.4s ease-out forwards; }
@@ -20,228 +21,17 @@
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800">
-    <div id="root"></div>
+    <div id="root">
+        <div style="padding: 20px; text-align: center; color: #94a3b8;">Loading Vibe...</div>
+    </div>
 
     <script type="text/babel">
-        const { useState, useEffect, useMemo, useRef } = React;
+        const { useState, useEffect, useMemo } = React;
 
-        // 【修正完了】Reactがクラッシュしない安全なアイコン描画
-        const Icon = ({ name, size = 18, className = "" }) => {
-            const spanRef = useRef(null);
-            
-            useEffect(() => {
-                if (spanRef.current && window.lucide) {
-                    // Reactの管理外でアイコンを生成する
-                    spanRef.current.innerHTML = `<i data-lucide="${name}"></i>`;
-                    window.lucide.createIcons({
-                        root: spanRef.current,
-                        attrs: { width: size, height: size }
-                    });
-                }
-            }, [name, size]);
-
-            // Reactにはこの空のspanだけを管理させる
-            return <span ref={spanRef} className={className} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: size, height: size }}></span>;
-        };
-
-        const CAT_IMAGES = {
-            silver: "https://images.unsplash.com/photo-1513245543132-31f507417b26?auto=format&fit=crop&q=80&w=200&h=200",
-            orange: "https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?auto=format&fit=crop&q=80&w=200&h=200"
-        };
-
-        const HabitTracker = () => {
-            const [history, setHistory] = useState([]);
-            const [inputValues, setInputValues] = useState({ 
-                hiit: "", greenEx: "", meditation: "", centering: "", pages: "", 
-                cooking: "", mission: "", meal: "", 
-                coldShower: "", bento: "" 
-            });
-            const [activeTab, setActiveTab] = useState('input');
-            const [lastSaved, setLastSaved] = useState("待機中");
-            
-            const todayStr = new Date().toLocaleDateString('sv-SE');
-            const [targetDate, setTargetDate] = useState(todayStr);
-
-            const WEEKLY_GOAL = 500;
-
-            useEffect(() => {
-                // 【修正完了】データ読み込み時のクラッシュ防止（安全装置）
-                try {
-                    const saved = localStorage.getItem('habit-v6-direct');
-                    if (saved) { 
-                        const parsedData = JSON.parse(saved);
-                        if (Array.isArray(parsedData)) {
-                            setHistory(parsedData); 
-                        }
-                    }
-                    setLastSaved("同期完了");
-                } catch (error) {
-                    console.error("データの読み込みに失敗しました:", error);
-                    setLastSaved("読込エラー");
-                }
-            }, []);
-
-            const playHappyMeow = () => {
-                try {
-                    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-                    const osc = ctx.createOscillator();
-                    const gain = ctx.createGain();
-                    osc.type = 'triangle';
-                    osc.frequency.setValueAtTime(500, ctx.currentTime);
-                    osc.frequency.exponentialRampToValueAtTime(1100, ctx.currentTime + 0.1);
-                    gain.gain.setValueAtTime(0.05, ctx.currentTime);
-                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
-                    osc.connect(gain); gain.connect(ctx.destination);
-                    osc.start(); osc.stop(ctx.currentTime + 0.4);
-                } catch (e) { console.log("Audio Error"); }
-            };
-
-            const updateStorage = (newHistory) => {
-                setHistory(newHistory);
-                localStorage.setItem('habit-v6-direct', JSON.stringify(newHistory));
-                setLastSaved(`保存済: ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`);
-            };
-
-            const addItem = (key, value) => {
-                if (!value || value.toString().trim() === "") return;
-                const entryValue = (key === 'mission' || key === 'meal') ? value.toString().trim() : parseInt(value, 10);
-                if (typeof entryValue === 'number' && isNaN(entryValue)) return;
-
-                const newEntry = { id: Date.now(), date: targetDate, month: targetDate.slice(0, 7), key, value: entryValue };
-                updateStorage([...history, newEntry]);
-                setInputValues({ ...inputValues, [key]: "" });
-                if (key === 'mission' || key === 'meal') playHappyMeow();
-                if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-            };
-
-            const deleteEntry = (id) => updateStorage(history.filter(e => e.id !== id));
-
-            const weeklyPoints = useMemo(() => {
-                const dateLimit = new Date();
-                dateLimit.setDate(dateLimit.getDate() - 7);
-                const limitStr = dateLimit.toLocaleDateString('sv-SE');
-                
-                return history
-                    .filter(e => e.date >= limitStr && typeof e.value === 'number')
-                    .reduce((acc, curr) => {
-                        let weight = 1;
-                        if (curr.key === 'hiit') weight = 20;   
-                        if (curr.key === 'cooking') weight = 30; 
-                        return acc + (curr.value * weight);
-                    }, 0);
-            }, [history]);
-
-            const isLuxuryMode = weeklyPoints >= WEEKLY_GOAL;
-
-            const weeklyBestDish = useMemo(() => {
-                const dateLimit = new Date();
-                dateLimit.setDate(dateLimit.getDate() - 7);
-                const limitStr = dateLimit.toLocaleDateString('sv-SE');
-                const dishes = history.filter(e => e.date >= limitStr && e.key === 'meal');
-                if (dishes.length === 0) return null;
-                return dishes[dishes.length - 1].value;
-            }, [history]);
-
-            const selectedDayTotals = useMemo(() => history.filter(e => e.date === targetDate).reduce((acc, curr) => {
-                if (typeof curr.value === 'number') acc[curr.key] = (acc[curr.key] || 0) + curr.value;
-                return acc;
-            }, {}), [history, targetDate]);
-
-            const catData = useMemo(() => {
-                const isPast = targetDate < todayStr;
-                const pool = isLuxuryMode ? [
-                    { name: "シウ", type: "silver", msg: "hiroさん…500pt超えなんて凄すぎて、もう言葉が出ないニャ…♡" },
-                    { name: "ケン", type: "orange", msg: "HIITも料理も完璧！hiroさんは僕たちのヒーローニャ！" }
-                ] : [
-                    { name: "シウ", type: "silver", msg: isPast ? "過去の分も埋めるhiroさんは、誠実で素敵だニャ。" : "冷水シャワーで身を清める…その精神力、見習うニャ。" },
-                    { name: "ケン", type: "orange", msg: "お弁当作りもポイントになるニャ！美味しいもの詰めてGOニャ！" }
-                ];
-                return pool[Math.floor(Math.random() * pool.length)];
-            }, [history, targetDate, isLuxuryMode]);
-
-            const InputCard = ({ id, label, icon, color, unit, presets = [], weightText = "" }) => (
-                <div className="p-5 rounded-[2.5rem] bg-white border border-slate-100 shadow-sm space-y-4 fade-in">
-                    <div className="flex items-center justify-between px-1">
-                        <div className="flex items-center gap-2 font-bold text-slate-600">
-                            <Icon name={icon} className={color} />
-                            <span className="text-sm">{label} <span className="text-[9px] text-slate-300 ml-1">{weightText}</span></span>
-                        </div>
-                        <div className="text-right">
-                            <span className="text-2xl font-black text-slate-800">{(selectedDayTotals[id] || 0)}</span>
-                            <span className="text-[10px] text-slate-400 ml-1 uppercase">{unit}</span>
-                        </div>
-                    </div>
-                    <div className="flex gap-2">
-                        <input type="number" inputMode="numeric" placeholder="入力" value={inputValues[id]}
-                            onChange={(e) => setInputValues({...inputValues, [id]: e.target.value})}
-                            onKeyDown={(e) => e.key === 'Enter' && addItem(id, inputValues[id])}
-                            className="flex-1 bg-slate-50 border-none rounded-2xl px-4 py-3 text-lg font-bold outline-none focus:ring-2 focus:ring-indigo-500"
-                        />
-                        <button onClick={() => addItem(id, inputValues[id])} className="bg-indigo-600 text-white px-6 rounded-2xl shadow-md active:scale-95 transition-transform"><Icon name="plus" size={24} /></button>
-                    </div>
-                    <div className="flex gap-2 pt-1 overflow-x-auto no-scrollbar">
-                        {presets.map(val => (
-                            <button key={val} onClick={() => addItem(id, val)} className="bg-slate-100 text-slate-600 text-[11px] font-bold px-4 py-2 rounded-xl shrink-0">+{val}{unit}</button>
-                        ))}
-                    </div>
-                </div>
-            );
-
-            return (
-                <div className="max-w-md mx-auto p-4 pb-24 min-h-screen">
-                    <header className="flex justify-between items-center mb-4 px-1">
-                        <div>
-                          <h1 className="text-2xl font-black text-indigo-600 italic leading-none">Habit Vibe 8.3</h1>
-                          <span className="text-[10px] font-bold text-emerald-500 flex items-center gap-1 mt-1 tracking-widest uppercase"><Icon name="check-circle" size={10} /> {lastSaved}</span>
-                        </div>
-                        <div className="flex gap-2 bg-white p-1 rounded-2xl shadow-sm border border-slate-100">
-                          <button onClick={() => setActiveTab('input')} className={`p-2.5 rounded-xl transition-all ${activeTab === 'input' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400'}`}><Icon name="edit-3" size={18} /></button>
-                          <button onClick={() => setActiveTab('stats')} className={`p-2.5 rounded-xl transition-all ${activeTab === 'stats' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400'}`}><Icon name="bar-chart-2" size={18} /></button>
-                        </div>
-                    </header>
-
-                    <div className="mb-4 flex items-center gap-3 bg-white p-4 rounded-[2rem] shadow-sm border border-slate-100 fade-in text-sm">
-                        <Icon name="calendar" className="text-indigo-400" />
-                        <input type="date" value={targetDate} onChange={(e) => setTargetDate(e.target.value)} className="bg-transparent font-bold text-slate-700 outline-none w-32" />
-                        {targetDate !== todayStr && <button onClick={() => setTargetDate(todayStr)} className="ml-auto text-[10px] font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-full">今日へ</button>}
-                    </div>
-
-                    <div className="mb-6 px-1">
-                        <div className="flex justify-between items-end mb-2">
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">週間ご褒美ゲージ</span>
-                            <span className={`text-xs font-black ${isLuxuryMode ? 'text-amber-500' : 'text-indigo-600'}`}>{weeklyPoints} / {WEEKLY_GOAL} <span className="text-[9px] font-normal text-slate-400 italic">Total Pts</span></span>
-                        </div>
-                        <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
-                            <div className={`h-full transition-all duration-1000 ${isLuxuryMode ? 'bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 shadow-[0_0_12px_#fbbf24]' : 'bg-indigo-500'}`} 
-                                 style={{ width: `${Math.min(100, (weeklyPoints / WEEKLY_GOAL) * 100)}%` }}></div>
-                        </div>
-                    </div>
-
-                    <div className={`rounded-[2.5rem] p-5 mb-6 text-white shadow-lg relative overflow-hidden transition-all duration-500 
-                        ${isLuxuryMode ? 'luxury-aura scale-[1.03]' : ''}
-                        ${catData.type === 'silver' ? 'from-slate-600 to-slate-800' : 'from-orange-400 to-amber-500'} bg-gradient-to-r`}>
-                      <div className="relative z-10 flex items-center gap-4">
-                        <img src={CAT_IMAGES[catData.type]} className={`w-14 h-14 rounded-full border-2 border-white/40 object-cover shadow-inner bg-white/20 ${isLuxuryMode ? 'ring-4 ring-yellow-400 animate-pulse' : ''}`} alt="cat" />
-                        <div className="flex-1">
-                          <p className="text-[10px] font-bold opacity-80 uppercase tracking-widest mb-0.5">{catData.name} {isLuxuryMode && "✨Master"}</p>
-                          <p className={`font-bold italic leading-relaxed ${isLuxuryMode ? 'text-[15px]' : 'text-sm'}`}>「{catData.msg}」</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {activeTab === 'input' ? (
-                      <div className="space-y-4">
-                        <div className="p-6 rounded-[2.5rem] bg-indigo-50 border border-indigo-100 space-y-3 shadow-sm fade-in">
-                            <div className="flex items-center gap-2 font-bold text-indigo-600 text-[10px] uppercase tracking-widest"><Icon name="flag" size={14} /> 今日のミッション</div>
-                            <div className="flex gap-2">
-                                <input type="text" placeholder="例：トレーニングした！" value={inputValues.mission}
-                                    onChange={(e) => setInputValues({...inputValues, mission: e.target.value})}
-                                    onKeyDown={(e) => e.key === 'Enter' && addItem('mission', inputValues.mission)}
-                                    className="flex-1 bg-white border-none rounded-2xl px-4 py-3 text-sm outline-none shadow-sm"
-                                />
-                                <button onClick={() => addItem('mission', inputValues.mission)} className="bg-indigo-600 text-white p-3 rounded-2xl shadow-md active:scale-95"><Icon name="send" /></button>
-                            </div>
-                        </div>
-
-                        <div className="p-6 rounded-[2.5rem] bg-rose-50 border border-rose-100 space-y-3 shadow-sm fade-in">
-                            <div className="flex items
+        // 【改善策】アイコンを外部読み込みせず、ここに直接埋め込みます（SVGデータ）
+        // これにより読み込みエラーで真っ白になるのを防ぎます
+        const ICONS_SVG = {
+            'check-circle': <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>,
+            'edit-3': <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>,
+            'bar-chart-2': <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>,
+            'calendar': <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y
