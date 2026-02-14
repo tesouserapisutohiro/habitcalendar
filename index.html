@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Habit Vibe 6.8</title>
+    <title>Habit Vibe 6.8 - Final</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -13,6 +13,9 @@
         body { -webkit-tap-highlight-color: transparent; font-family: sans-serif; overflow-x: hidden; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
+        /* アニメーションの追加 */
+        .fade-in { animation: fadeIn 0.5s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800">
@@ -21,16 +24,15 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
 
-        // アイコンを安全に表示するためのコンポーネント
+        // アイコンコンポーネント
         const Icon = ({ name, size = 18, className = "" }) => {
-            useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, []);
+            useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, [name]);
             return <i data-lucide={name} className={className} style={{ width: size, height: size }}></i>;
         };
 
-        // 愛猫シウちゃんとケンちゃんのイメージ画像
         const CAT_IMAGES = {
-            silver: "https://images.unsplash.com/photo-1513245543132-31f507417b26?auto=format&fit=crop&q=80&w=200&h=200", // サバトラ風 (シウ)
-            orange: "https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?auto=format&fit=crop&q=80&w=200&h=200"  // 茶トラ風 (ケン)
+            silver: "https://images.unsplash.com/photo-1513245543132-31f507417b26?auto=format&fit=crop&q=80&w=200&h=200", // シウ
+            orange: "https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?auto=format&fit=crop&q=80&w=200&h=200"  // ケン
         };
 
         const HabitTracker = () => {
@@ -42,16 +44,14 @@
             const currentMonth = new Date().toISOString().slice(0, 7);
             const today = new Date().toLocaleDateString('sv-SE');
 
-            // 起動時にデータを読み込む
             useEffect(() => {
                 const saved = localStorage.getItem('habit-v6-direct');
                 if (saved) {
                     setHistory(JSON.parse(saved));
-                    setLastSaved("データ同期完了");
+                    setLastSaved("同期完了");
                 }
             }, []);
 
-            // データの保存（自動セーブ）
             const updateStorage = (newHistory) => {
                 setHistory(newHistory);
                 localStorage.setItem('habit-v6-direct', JSON.stringify(newHistory));
@@ -60,11 +60,24 @@
             };
 
             const addItem = (key, value) => {
-                if (!value) return;
-                const entryValue = key === 'mission' ? value : parseInt(value, 10);
+                if (value === undefined || value === null || value.toString().trim() === "") return;
+
+                let entryValue;
+                if (key === 'mission') {
+                    entryValue = value.toString().trim();
+                } else {
+                    entryValue = parseInt(value, 10);
+                    if (isNaN(entryValue)) return;
+                }
+
                 const newEntry = { id: Date.now(), date: today, month: currentMonth, key, value: entryValue };
                 updateStorage([...history, newEntry]);
                 setInputValues({ ...inputValues, [key]: "" });
+
+                // モバイルキーボードを閉じる
+                if (document.activeElement instanceof HTMLElement) {
+                    document.activeElement.blur();
+                }
             };
 
             const deleteEntry = (id) => updateStorage(history.filter(e => e.id !== id));
@@ -74,7 +87,6 @@
                 entry ? deleteEntry(entry.id) : addItem(key, 1);
             };
 
-            // 集計ロジック
             const todayTotals = useMemo(() => history.filter(e => e.date === today).reduce((acc, curr) => {
                 if (typeof curr.value === 'number') acc[curr.key] = (acc[curr.key] || 0) + curr.value;
                 return acc;
@@ -99,19 +111,22 @@
                 return bests;
             }, [history]);
 
-            // 猫たちの応援メッセージ
+            // 猫のメッセージ（ミッション連動）
             const catData = useMemo(() => {
-                const data = [
-                  { name: "シウ (サバトラ)", type: "silver", msg: "hiroさん、日本語になって使いやすくなったね！" },
-                  { name: "ケン (茶トラ)", type: "orange", msg: "打ち間違えても、下のゴミ箱で消せるから安心だニャ！" },
-                  { name: "シウ (サバトラ)", type: "silver", msg: "和歌山でのトレーニング、ボクも見てるよ！" },
-                  { name: "ケン (茶トラ)", type: "orange", msg: "今日のミッション達成、かっこいいニャ〜！" }
+                const missions = history.filter(e => e.date === today && e.key === 'mission');
+                const lastM = missions.length > 0 ? missions[missions.length - 1].value : null;
+
+                const pool = [
+                    { name: "シウ (サバトラ)", type: "silver", msg: "hiroさん、和歌山の空気が気持ちいいね！" },
+                    { name: "ケン (茶トラ)", type: "orange", msg: lastM ? `「${lastM}」達成！最高だニャ！` : "打ち間違えても、ゴミ箱から消せるから大丈夫ニャ。" },
+                    { name: "シウ (サバトラ)", type: "silver", msg: "今日も一歩ずつ、進んでいこう！" },
+                    { name: "ケン (茶トラ)", type: "orange", msg: lastM ? `ミッション：${lastM}…やるニャ！` : "今日のミッション、楽しみにしてるニャ！" }
                 ];
-                return data[Math.floor(Math.random() * data.length)];
-            }, [todayTotals]);
+                return pool[Math.floor(Math.random() * pool.length)];
+            }, [history, today]);
 
             const InputCard = ({ id, label, icon, color, unit, presets = [] }) => (
-                <div className="p-5 rounded-[2.5rem] bg-white border border-slate-100 shadow-sm space-y-4">
+                <div className="p-5 rounded-[2.5rem] bg-white border border-slate-100 shadow-sm space-y-4 fade-in">
                     <div className="flex items-center justify-between px-1">
                         <div className="flex items-center gap-2 font-bold text-slate-600">
                             <Icon name={icon} className={color} />
@@ -122,17 +137,16 @@
                             <span className="text-[10px] text-slate-400 ml-1 uppercase">{unit}</span>
                         </div>
                     </div>
-                    
                     <div className="flex gap-2">
                         <input type="number" inputMode="numeric" placeholder="数字を入力" value={inputValues[id]}
                             onChange={(e) => setInputValues({...inputValues, [id]: e.target.value})}
+                            onKeyDown={(e) => e.key === 'Enter' && addItem(id, inputValues[id])}
                             className="flex-1 bg-slate-50 border-none rounded-2xl px-4 py-3 text-lg font-bold outline-none focus:ring-2 focus:ring-indigo-500"
                         />
                         <button onClick={() => addItem(id, inputValues[id])} className="bg-indigo-600 text-white px-6 rounded-2xl shadow-md active:scale-95 transition-transform">
                             <Icon name="plus" size={24} />
                         </button>
                     </div>
-
                     <div className="flex gap-2 pt-1 overflow-x-auto no-scrollbar">
                         {presets.map(val => (
                             <button key={val} onClick={() => addItem(id, val)} className="bg-slate-100 text-slate-600 text-[11px] font-bold px-4 py-2 rounded-xl active:bg-slate-200 shrink-0">
@@ -162,11 +176,10 @@
                         </div>
                     </header>
 
-                    {/* 猫たちの応援エリア（画像付き） */}
                     <div className={`bg-gradient-to-r rounded-[2.5rem] p-5 mb-6 text-white shadow-lg relative overflow-hidden transition-all duration-500 ${catData?.type === 'silver' ? 'from-slate-500 to-slate-700' : 'from-orange-400 to-amber-500'}`}>
                       <div className="relative z-10 flex items-center gap-4">
                         <div className="w-14 h-14 rounded-full border-2 border-white/40 overflow-hidden shadow-inner bg-white/20">
-                            {catData && <img src={CAT_IMAGES[catData.type]} className="w-full h-full object-cover" alt="猫アイコン" />}
+                            <img src={CAT_IMAGES[catData.type]} className="w-full h-full object-cover" alt="cat" />
                         </div>
                         <div className="flex-1">
                           <p className="text-[10px] font-bold opacity-80 uppercase tracking-widest mb-0.5">{catData?.name}</p>
@@ -176,15 +189,15 @@
                     </div>
 
                     {activeTab === 'input' ? (
-                      <div className="space-y-4 animate-in fade-in duration-500">
-                        {/* 今日のミッション */}
-                        <div className="p-6 rounded-[2.5rem] bg-indigo-50 border border-indigo-100 space-y-3 shadow-sm">
+                      <div className="space-y-4">
+                        <div className="p-6 rounded-[2.5rem] bg-indigo-50 border border-indigo-100 space-y-3 shadow-sm fade-in">
                             <div className="flex items-center gap-2 font-bold text-indigo-600 text-xs uppercase tracking-widest">
                                 <Icon name="flag" size={14} /> 今日のミッション達成！
                             </div>
                             <div className="flex gap-2">
                                 <input type="text" placeholder="例：アプリを更新した！" value={inputValues.mission}
                                     onChange={(e) => setInputValues({...inputValues, mission: e.target.value})}
+                                    onKeyDown={(e) => e.key === 'Enter' && addItem('mission', inputValues.mission)}
                                     className="flex-1 bg-white border-none rounded-2xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
                                 />
                                 <button onClick={() => addItem('mission', inputValues.mission)} className="bg-indigo-600 text-white p-3 rounded-2xl shadow-md active:scale-95 transition-transform">
@@ -193,7 +206,7 @@
                             </div>
                             <div className="flex flex-wrap gap-2 pt-1">
                                 {history.filter(e => e.date === today && e.key === 'mission').map(m => (
-                                    <div key={m.id} className="bg-white px-3 py-1.5 rounded-full text-[10px] font-bold text-indigo-600 shadow-sm flex items-center gap-2">
+                                    <div key={m.id} className="bg-white px-3 py-1.5 rounded-full text-[10px] font-bold text-indigo-600 shadow-sm flex items-center gap-2 fade-in">
                                         <span>{m.value}</span>
                                         <button onClick={() => deleteEntry(m.id)} className="text-red-300 hover:text-red-500"><Icon name="x" size={12} /></button>
                                     </div>
@@ -216,74 +229,5 @@
                             </button>
                         </div>
 
-                        {/* 【復活】今日の全ログ（修正・削除用） */}
                         <div className="bg-white rounded-[2.5rem] p-6 shadow-sm border border-slate-100 mt-6 mb-10">
-                            <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-4 italic flex items-center gap-2">
-                                <Icon name="list" size={12} /> 今日のログ (タップで削除)
-                            </h2>
-                            <div className="space-y-2">
-                                {history.filter(e => e.date === today).reverse().map(entry => (
-                                    <div key={entry.id} className="flex justify-between items-center py-2 border-b border-slate-50 last:border-0 px-1 animate-in slide-in-from-left duration-300">
-                                        <div className="flex flex-col">
-                                            <span className="text-[8px] font-bold text-slate-300 uppercase leading-none mb-1">{entry.key}</span>
-                                            <span className="text-sm font-bold text-slate-600">+{entry.value}</span>
-                                        </div>
-                                        <button onClick={() => deleteEntry(entry.id)} className="text-slate-200 hover:text-red-400 p-2 active:scale-75 transition-transform">
-                                            <Icon name="trash-2" size={16} />
-                                        </button>
-                                    </div>
-                                ))}
-                                {history.filter(e => e.date === today).length === 0 && (
-                                    <p className="text-center text-[10px] text-slate-300 py-6 italic">今日の記録はまだありません</p>
-                                )}
-                            </div>
-                        </div>
-                      </div>
-                    ) : (
-                      /* 統計タブの中身 */
-                      <div className="space-y-6 animate-in slide-in-from-right duration-500 pb-10">
-                        <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-100">
-                          <h2 className="text-xs font-bold text-slate-400 mb-8 uppercase tracking-[0.2em] flex items-center gap-2">
-                             <Icon name="activity" size={14}/> 週間アクティビティ
-                          </h2>
-                          <div className="h-40 flex items-end gap-3 px-1">
-                            {[...Array(7)].map((_, i) => {
-                                const d = new Date(); d.setDate(d.getDate() - (6-i));
-                                const dateStr = d.toLocaleDateString('sv-SE');
-                                const total = history.filter(e => e.date === dateStr && typeof e.value === 'number').reduce((acc, curr) => acc + curr.value, 0);
-                                return (
-                                    <div key={i} className="flex-1 flex flex-col items-center gap-3">
-                                        <div className="w-full bg-slate-50 rounded-full relative flex items-end overflow-hidden h-full shadow-inner border border-slate-100">
-                                            <div className="w-full bg-indigo-500/80 transition-all duration-1000 rounded-full shadow-sm" style={{ height: `${Math.min(100, (total / 100) * 100)}%` }}></div>
-                                        </div>
-                                        <span className="text-[8px] font-bold text-slate-400">{dateStr.slice(8)}</span>
-                                    </div>
-                                );
-                            })}
-                          </div>
-                        </div>
-                        <div className="bg-slate-900 rounded-[2.5rem] p-8 text-white shadow-xl">
-                          <h2 className="text-xs font-bold text-indigo-300 mb-8 uppercase tracking-[0.2em]">月間レポート</h2>
-                          {['cooking', 'greenEx', 'meditation', 'pages', 'hiit'].map(key => (
-                            <div key={key} className="mb-6 space-y-2">
-                              <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-slate-500">
-                                <span>{key}</span>
-                                <span className="text-indigo-200">{monthTotals[key] || 0} / 自己ベスト: {personalBests[key] || 0}</span>
-                              </div>
-                              <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                                <div className="h-full bg-indigo-400 transition-all duration-1000" style={{ width: `${personalBests[key] > 0 ? Math.min(100, ((monthTotals[key] || 0) / personalBests[key]) * 100) : 0}%` }}></div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                </div>
-            );
-        };
-
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<HabitTracker />);
-    </script>
-</body>
-</html>
+                            <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-4 italic flex items-center
