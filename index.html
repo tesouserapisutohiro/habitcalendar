@@ -36,8 +36,13 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
 
+        // アイコンコンポーネント（エラー防止機能付き）
         const Icon = ({ name, size = 18, className = "" }) => {
-            useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, [name]);
+            useEffect(() => { 
+                if (window.lucide) {
+                    window.lucide.createIcons();
+                }
+            }, [name]);
             return <i data-lucide={name} className={className} style={{ width: size, height: size, display: 'inline-block' }}></i>;
         };
 
@@ -48,8 +53,18 @@
 
         const HabitTracker = () => {
             const [history, setHistory] = useState([]);
-            // readingを追加
-            const [inputValues, setInputValues] = useState({ hiit: "", greenEx: "", meditation: "", centering: "", reading: "", cooking: "", mission: "", meal: "" });
+            
+            // 修正箇所: reading を確実に初期化
+            const [inputValues, setInputValues] = useState({ 
+                hiit: "", 
+                reading: "", // ←ここが重要です
+                meditation: "", 
+                centering: "", 
+                cooking: "", 
+                mission: "", 
+                meal: "" 
+            });
+            
             const [activeTab, setActiveTab] = useState('input');
             const [lastSaved, setLastSaved] = useState("待機中");
             
@@ -60,11 +75,17 @@
             const HIIT_WEIGHT = 20;
             const COOKING_WEIGHT = 30;
 
+            // データ読み込み
             useEffect(() => {
-                const saved = localStorage.getItem('habit-v8-magic');
-                if (saved) { setHistory(JSON.parse(saved)); setLastSaved("同期完了"); }
+                try {
+                    const saved = localStorage.getItem('habit-v8-magic');
+                    if (saved) { setHistory(JSON.parse(saved)); setLastSaved("同期完了"); }
+                } catch (e) {
+                    console.error("Load error", e);
+                }
             }, []);
 
+            // データ保存
             const updateStorage = (newHistory) => {
                 setHistory(newHistory);
                 localStorage.setItem('habit-v8-magic', JSON.stringify(newHistory));
@@ -77,13 +98,16 @@
                 
                 const newEntry = { id: Date.now(), date: targetDate, key, value: entryValue };
                 updateStorage([...history, newEntry]);
+                
+                // 特定のキー以外は入力をクリア
                 if (key !== 'coldShower' && key !== 'bento') {
-                    setInputValues({ ...inputValues, [key]: "" });
+                    setInputValues(prev => ({ ...prev, [key]: "" }));
                 }
             };
 
             const deleteEntry = (id) => updateStorage(history.filter(e => e.id !== id));
 
+            // ポイント計算
             const weeklyPoints = useMemo(() => {
                 const limitDate = new Date();
                 limitDate.setDate(limitDate.getDate() - 7);
@@ -95,7 +119,7 @@
                         let weight = 1;
                         if (curr.key === 'hiit') weight = HIIT_WEIGHT;
                         if (curr.key === 'cooking') weight = COOKING_WEIGHT;
-                        // 読書は1ページ1ptとして計算（必要に応じて調整可能）
+                        // 読書はページ数そのまま(1pt)
                         return acc + (curr.value * weight);
                     }, 0);
             }, [history]);
@@ -119,9 +143,10 @@
                 if (isMagicActive) {
                     return { name: "シウ＆ケン", type: "orange", msg: "hiroさん、500pt達成！魔法が解けないうちに次も狙うニャ✨" };
                 }
-                return { name: "シウ", type: "silver", msg: "読書も追加したニャ！知識は一生の宝物になるニャ✨" };
+                return { name: "シウ", type: "silver", msg: "読書も追加したニャ。知識が増えると世界が広がるニャ！" };
             }, [isMagicActive]);
 
+            // 入力カードコンポーネント（安全策を追加）
             const InputCard = ({ id, label, icon, color, unit, presets = [], weightText = "" }) => (
                 <div className="p-5 rounded-[2.5rem] bg-white border border-slate-100 shadow-sm space-y-4">
                     <div className="flex items-center justify-between px-1">
@@ -135,38 +160,10 @@
                         </div>
                     </div>
                     <div className="flex gap-2">
-                        <input type="number" inputMode="numeric" placeholder="入力" value={inputValues[id]}
+                        <input 
+                            type="number" 
+                            inputMode="numeric" 
+                            placeholder="入力" 
+                            value={inputValues[id] || ""} 
                             onChange={(e) => setInputValues({...inputValues, [id]: e.target.value})}
-                            onKeyDown={(e) => e.key === 'Enter' && addItem(id, inputValues[id])}
-                            className="flex-1 bg-slate-50 border-none rounded-2xl px-4 py-3 text-lg font-bold outline-none"
-                        />
-                        <button onClick={() => addItem(id, inputValues[id])} className="bg-indigo-600 text-white px-6 rounded-2xl shadow-md active:scale-95 transition-transform"><Icon name="plus" size={24} /></button>
-                    </div>
-                    <div className="flex gap-2 pt-1 overflow-x-auto no-scrollbar">
-                        {presets.map(val => (
-                            <button key={val} onClick={() => addItem(id, val)} className="bg-slate-100 text-slate-600 text-[11px] font-bold px-4 py-2 rounded-xl shrink-0">+{val}{unit}</button>
-                        ))}
-                    </div>
-                </div>
-            );
-
-            return (
-                <div className="max-w-md mx-auto p-4 pb-24 min-h-screen">
-                    <header className="flex justify-between items-center mb-6">
-                        <div>
-                            <h1 className="text-2xl font-black text-indigo-600 italic">Habit Vibe 8.6</h1>
-                            <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">{lastSaved}</span>
-                        </div>
-                        <div className="flex gap-2 bg-white p-1 rounded-2xl shadow-sm border border-slate-100">
-                            <button onClick={() => setActiveTab('input')} className={`p-2.5 rounded-xl transition-all ${activeTab === 'input' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400'}`}><Icon name="edit-3" size={18} /></button>
-                            <button onClick={() => setActiveTab('stats')} className={`p-2.5 rounded-xl transition-all ${activeTab === 'stats' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400'}`}><Icon name="bar-chart-2" size={18} /></button>
-                        </div>
-                    </header>
-
-                    {/* ゲージ */}
-                    <div className="mb-6 bg-white p-5 rounded-[2.5rem] shadow-sm border border-slate-100">
-                        <div className="flex justify-between items-end mb-2">
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Weekly Magic Gauge</span>
-                            <span className={`text-xs font-black ${isMagicActive ? 'text-amber-500' : 'text-indigo-600'}`}>{weeklyPoints} / {WEEKLY_GOAL} Pts</span>
-                        </div>
-                        <div className="h-3 bg-slate-100 rounded-full overflow-
+                            onKeyDown={(e) => e
