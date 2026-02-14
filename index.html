@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Habit Vibe 9.0 - Safe Mode</title>
+    <title>Habit Vibe 8.6 - Magic Edition</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin></script>
@@ -34,21 +34,10 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        // エラーが発生しても白い画面のままにしないための安全策
-        window.onerror = function(msg, url, line) {
-            document.body.innerHTML = '<div style="padding:20px; text-align:center;"><h1>起動エラー</h1><p>データをリセットする必要があります。</p><button onclick="localStorage.clear(); location.reload();" style="padding:10px 20px; background:red; color:white; border-radius:10px;">データを全消去して復旧</button></div>';
-            return true;
-        };
-
         const { useState, useEffect, useMemo } = React;
 
-        // アイコン表示の安全化
         const Icon = ({ name, size = 18, className = "" }) => {
-            useEffect(() => { 
-                if (typeof window !== 'undefined' && window.lucide && window.lucide.createIcons) {
-                    window.lucide.createIcons(); 
-                }
-            }, [name]);
+            useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, [name]);
             return <i data-lucide={name} className={className} style={{ width: size, height: size, display: 'inline-block' }}></i>;
         };
 
@@ -61,42 +50,228 @@
             const [history, setHistory] = useState([]);
             const [inputValues, setInputValues] = useState({ hiit: "", greenEx: "", meditation: "", centering: "", pages: "", cooking: "", mission: "", meal: "" });
             const [activeTab, setActiveTab] = useState('input');
-            const [lastSaved, setLastSaved] = useState("読込中...");
+            const [lastSaved, setLastSaved] = useState("待機中");
             
             const todayStr = new Date().toLocaleDateString('sv-SE');
             const [targetDate, setTargetDate] = useState(todayStr);
 
-            // ポイント倍率設定（ご指定通り）
             const WEEKLY_GOAL = 500;
-            const WEIGHTS = {
-                cooking: 30,     // 料理: 30倍
-                hiit: 20,        // HIIT: 20倍
-                coldShower: 10,  // 冷水シャワー: 10倍
-                bento: 10        // 弁当: 10倍
-                // 他はデフォルト1倍
+            const HIIT_WEIGHT = 20;
+            const COOKING_WEIGHT = 30;
+
+            useEffect(() => {
+                const saved = localStorage.getItem('habit-v8-magic');
+                if (saved) { setHistory(JSON.parse(saved)); setLastSaved("同期完了"); }
+            }, []);
+
+            const updateStorage = (newHistory) => {
+                setHistory(newHistory);
+                localStorage.setItem('habit-v8-magic', JSON.stringify(newHistory));
+                setLastSaved(`保存済: ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`);
             };
 
-            // 【重要】データ読み込みと修復処理
-            useEffect(() => {
-                try {
-                    const saved = localStorage.getItem('habit-v8-magic');
-                    if (saved) {
-                        const parsed = JSON.parse(saved);
-                        if (Array.isArray(parsed)) {
-                            // データのクリーニング（壊れたデータを除外）
-                            const cleanData = parsed.filter(item => {
-                                // 値がオブジェクトになってしまっている不正データを除外
-                                const isValueValid = typeof item.value === 'number' || typeof item.value === 'string';
-                                return item && item.id && isValueValid;
-                            });
-                            setHistory(cleanData);
-                            setLastSaved("同期完了");
-                        } else {
-                            // 配列でない場合は初期化
-                            setHistory([]);
-                            setLastSaved("初期化済");
-                        }
-                    } else {
-                        setLastSaved("新規開始");
-                    }
-                } catch
+            const addItem = (key, value) => {
+                if (value === undefined || value === null || value.toString().trim() === "") return;
+                const entryValue = (typeof value === 'string' && isNaN(parseInt(value, 10))) ? value.toString().trim() : parseInt(value, 10);
+                
+                const newEntry = { id: Date.now(), date: targetDate, key, value: entryValue };
+                updateStorage([...history, newEntry]);
+                if (key !== 'coldShower' && key !== 'bento') {
+                    setInputValues({ ...inputValues, [key]: "" });
+                }
+            };
+
+            const deleteEntry = (id) => updateStorage(history.filter(e => e.id !== id));
+
+            const weeklyPoints = useMemo(() => {
+                const limitDate = new Date();
+                limitDate.setDate(limitDate.getDate() - 7);
+                const limitStr = limitDate.toLocaleDateString('sv-SE');
+                
+                return history
+                    .filter(e => e.date >= limitStr && typeof e.value === 'number')
+                    .reduce((acc, curr) => {
+                        let weight = 1;
+                        if (curr.key === 'hiit') weight = HIIT_WEIGHT;
+                        if (curr.key === 'cooking') weight = COOKING_WEIGHT;
+                        return acc + (curr.value * weight);
+                    }, 0);
+            }, [history]);
+
+            const isMagicActive = weeklyPoints >= WEEKLY_GOAL;
+
+            const weeklyBestDish = useMemo(() => {
+                const limitDate = new Date();
+                limitDate.setDate(limitDate.getDate() - 7);
+                const limitStr = limitDate.toLocaleDateString('sv-SE');
+                const dishes = history.filter(e => e.date >= limitStr && e.key === 'meal');
+                return dishes.length > 0 ? dishes[dishes.length - 1].value : null;
+            }, [history]);
+
+            const selectedDayTotals = useMemo(() => history.filter(e => e.date === targetDate).reduce((acc, curr) => {
+                if (typeof curr.value === 'number') acc[curr.key] = (acc[curr.key] || 0) + curr.value;
+                return acc;
+            }, {}), [history, targetDate]);
+
+            const catData = useMemo(() => {
+                if (isMagicActive) {
+                    return { name: "シウ＆ケン", type: "orange", msg: "hiroさん、500pt達成！魔法が解けないうちに次も狙うニャ✨" };
+                }
+                return { name: "シウ", type: "silver", msg: "冷水シャワーと弁当も追加したニャ。一歩ずつ完璧に近づいてるニャ！" };
+            }, [isMagicActive]);
+
+            const InputCard = ({ id, label, icon, color, unit, presets = [], weightText = "" }) => (
+                <div className="p-5 rounded-[2.5rem] bg-white border border-slate-100 shadow-sm space-y-4">
+                    <div className="flex items-center justify-between px-1">
+                        <div className="flex items-center gap-2 font-bold text-slate-600">
+                            <Icon name={icon} className={color} />
+                            <span className="text-sm">{label} <span className="text-[9px] text-slate-400 ml-1">{weightText}</span></span>
+                        </div>
+                        <div className="text-right">
+                            <span className="text-2xl font-black text-slate-800">{(selectedDayTotals[id] || 0)}</span>
+                            <span className="text-[10px] text-slate-400 ml-1 uppercase">{unit}</span>
+                        </div>
+                    </div>
+                    <div className="flex gap-2">
+                        <input type="number" inputMode="numeric" placeholder="入力" value={inputValues[id]}
+                            onChange={(e) => setInputValues({...inputValues, [id]: e.target.value})}
+                            onKeyDown={(e) => e.key === 'Enter' && addItem(id, inputValues[id])}
+                            className="flex-1 bg-slate-50 border-none rounded-2xl px-4 py-3 text-lg font-bold outline-none"
+                        />
+                        <button onClick={() => addItem(id, inputValues[id])} className="bg-indigo-600 text-white px-6 rounded-2xl shadow-md active:scale-95 transition-transform"><Icon name="plus" size={24} /></button>
+                    </div>
+                    <div className="flex gap-2 pt-1 overflow-x-auto no-scrollbar">
+                        {presets.map(val => (
+                            <button key={val} onClick={() => addItem(id, val)} className="bg-slate-100 text-slate-600 text-[11px] font-bold px-4 py-2 rounded-xl shrink-0">+{val}{unit}</button>
+                        ))}
+                    </div>
+                </div>
+            );
+
+            return (
+                <div className="max-w-md mx-auto p-4 pb-24 min-h-screen">
+                    <header className="flex justify-between items-center mb-6">
+                        <div>
+                            <h1 className="text-2xl font-black text-indigo-600 italic">Habit Vibe 8.6</h1>
+                            <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">{lastSaved}</span>
+                        </div>
+                        <div className="flex gap-2 bg-white p-1 rounded-2xl shadow-sm border border-slate-100">
+                            <button onClick={() => setActiveTab('input')} className={`p-2.5 rounded-xl transition-all ${activeTab === 'input' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400'}`}><Icon name="edit-3" size={18} /></button>
+                            <button onClick={() => setActiveTab('stats')} className={`p-2.5 rounded-xl transition-all ${activeTab === 'stats' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400'}`}><Icon name="bar-chart-2" size={18} /></button>
+                        </div>
+                    </header>
+
+                    {/* ゲージ */}
+                    <div className="mb-6 bg-white p-5 rounded-[2.5rem] shadow-sm border border-slate-100">
+                        <div className="flex justify-between items-end mb-2">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Weekly Magic Gauge</span>
+                            <span className={`text-xs font-black ${isMagicActive ? 'text-amber-500' : 'text-indigo-600'}`}>{weeklyPoints} / {WEEKLY_GOAL} Pts</span>
+                        </div>
+                        <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
+                            <div className={`h-full transition-all duration-1000 ${isMagicActive ? 'bg-gradient-to-r from-amber-400 to-yellow-500' : 'bg-indigo-500'}`} 
+                                 style={{ width: `${Math.min(100, (weeklyPoints / WEEKLY_GOAL) * 100)}%` }}></div>
+                        </div>
+                    </div>
+
+                    {/* 猫メッセージ */}
+                    <div className={`rounded-[2.5rem] p-6 mb-8 text-white shadow-lg transition-all duration-700 ${isMagicActive ? 'luxury-aura' : ''} ${catData.type === 'silver' ? 'from-slate-600 to-slate-800' : 'from-orange-400 to-amber-500'} bg-gradient-to-r`}>
+                      <div className="flex items-center gap-4">
+                        <img src={CAT_IMAGES[catData.type]} className="w-14 h-14 rounded-full border-2 border-white/40 object-cover" alt="cat" />
+                        <div>
+                          <p className="text-[10px] font-bold opacity-80 uppercase">{catData.name}</p>
+                          <p className={`font-bold italic ${isMagicActive ? 'text-[16px] magic-text' : 'text-sm'}`}>「{catData.msg}」</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {activeTab === 'input' ? (
+                        <div className="space-y-4">
+                            <div className="flex items-center gap-3 bg-white p-4 rounded-[2rem] shadow-sm border border-slate-100 mb-2">
+                                <Icon name="calendar" className="text-indigo-400" />
+                                <input type="date" value={targetDate} onChange={(e) => setTargetDate(e.target.value)} className="bg-transparent font-bold text-slate-700 outline-none w-32" />
+                            </div>
+
+                            {/* クイック完了ボタン（冷水シャワー & 弁当） */}
+                            <div className="grid grid-cols-2 gap-3 mb-2">
+                                <button onClick={() => addItem('coldShower', 1)} className="flex items-center justify-between bg-blue-500 text-white p-5 rounded-[2rem] shadow-md active:scale-95 transition-all">
+                                    <div className="flex flex-col items-start">
+                                        <Icon name="snowflake" size={20} />
+                                        <span className="text-[10px] font-bold uppercase mt-1">Cold Shower</span>
+                                        <span className="text-lg font-black leading-none">冷水シャワー</span>
+                                    </div>
+                                    <span className="bg-white/20 px-2 py-1 rounded-lg text-xs font-bold">{(selectedDayTotals['coldShower'] || 0)}</span>
+                                </button>
+                                <button onClick={() => addItem('bento', 1)} className="flex items-center justify-between bg-emerald-500 text-white p-5 rounded-[2rem] shadow-md active:scale-95 transition-all">
+                                    <div className="flex flex-col items-start">
+                                        <Icon name="package" size={20} />
+                                        <span className="text-[10px] font-bold uppercase mt-1">Bento Box</span>
+                                        <span className="text-lg font-black leading-none">弁当完了</span>
+                                    </div>
+                                    <span className="bg-white/20 px-2 py-1 rounded-lg text-xs font-bold">{(selectedDayTotals['bento'] || 0)}</span>
+                                </button>
+                            </div>
+
+                            <div className="p-6 rounded-[2.5rem] bg-indigo-50 border border-indigo-100 space-y-3 shadow-sm">
+                                <div className="flex items-center gap-2 font-bold text-indigo-600 text-[10px] uppercase tracking-widest"><Icon name="flag" size={14} /> 今日のミッション</div>
+                                <div className="flex gap-2">
+                                    <input type="text" placeholder="例：散歩した" value={inputValues.mission}
+                                        onChange={(e) => setInputValues({...inputValues, mission: e.target.value})}
+                                        onKeyDown={(e) => e.key === 'Enter' && addItem('mission', inputValues.mission)}
+                                        className="flex-1 bg-white border-none rounded-2xl px-4 py-3 text-sm outline-none"
+                                    />
+                                    <button onClick={() => addItem('mission', inputValues.mission)} className="bg-indigo-600 text-white p-3 rounded-2xl shadow-md"><Icon name="send" /></button>
+                                </div>
+                            </div>
+
+                            <div className="p-6 rounded-[2.5rem] bg-rose-50 border border-rose-100 space-y-3 shadow-sm">
+                                <div className="flex items-center gap-2 font-bold text-rose-600 text-[10px] uppercase tracking-widest"><Icon name="utensils" size={14} /> 本日の絶品メニュー</div>
+                                <div className="flex gap-2">
+                                    <input type="text" placeholder="例：サーモントラウトのソテー" value={inputValues.meal}
+                                        onChange={(e) => setInputValues({...inputValues, meal: e.target.value})}
+                                        onKeyDown={(e) => e.key === 'Enter' && addItem('meal', inputValues.meal)}
+                                        className="flex-1 bg-white border-none rounded-2xl px-4 py-3 text-sm outline-none"
+                                    />
+                                    <button onClick={() => addItem('meal', inputValues.meal)} className="bg-rose-500 text-white p-3 rounded-2xl shadow-md"><Icon name="heart" /></button>
+                                </div>
+                            </div>
+
+                            <InputCard id="hiit" label="HIIT" icon="zap" color="text-red-500" unit="分" presets={[4, 8, 12]} weightText="×20pts" />
+                            <InputCard id="cooking" label="料理記録" icon="chef-hat" color="text-rose-500" unit="回" presets={[1, 2, 3]} weightText="×30pts" />
+                            <InputCard id="centering" label="センタリング" icon="compass" color="text-blue-500" unit="分" presets={[10, 20, 30]} />
+                            <InputCard id="meditation" label="瞑想" icon="flower-2" color="text-purple-500" unit="分" presets={[10, 20, 30]} />
+                        </div>
+                    ) : (
+                        <div className="space-y-6">
+                            {weeklyBestDish && (
+                                <div className="p-8 rounded-[2.5rem] bg-white shadow-lg border-2 border-rose-100 text-center space-y-2">
+                                    <div className="inline-flex p-3 bg-rose-500 text-white rounded-full mb-2"><Icon name="award" size={24} /></div>
+                                    <h2 className="text-[10px] font-black text-rose-400 uppercase tracking-widest">Week's Best Dish</h2>
+                                    <p className="text-xl font-black text-slate-800 leading-tight">「{weeklyBestDish}」</p>
+                                </div>
+                            )}
+
+                            <div className="bg-white rounded-[2.5rem] p-6 shadow-sm border border-slate-100">
+                                <h2 className="text-xs font-bold text-slate-400 mb-4 uppercase tracking-widest">履歴ログ</h2>
+                                <div className="max-h-64 overflow-y-auto space-y-2 pr-2 no-scrollbar">
+                                    {history.slice().reverse().map(entry => (
+                                        <div key={entry.id} className="flex justify-between items-center py-2 border-b border-slate-50">
+                                            <div>
+                                                <p className="text-[8px] font-bold text-slate-300 uppercase">{entry.date} / {entry.key}</p>
+                                                <p className="text-sm font-bold text-slate-700">{typeof entry.value === 'number' ? `+${entry.value}` : entry.value}</p>
+                                            </div>
+                                            <button onClick={() => deleteEntry(entry.id)} className="text-slate-200 hover:text-red-400 transition-colors"><Icon name="trash-2" size={14} /></button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<HabitTracker />);
+    </script>
+</body>
+</html>
