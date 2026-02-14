@@ -48,7 +48,8 @@
 
         const HabitTracker = () => {
             const [history, setHistory] = useState([]);
-            const [inputValues, setInputValues] = useState({ hiit: "", greenEx: "", meditation: "", centering: "", pages: "", cooking: "", mission: "", meal: "" });
+            // readingを追加
+            const [inputValues, setInputValues] = useState({ hiit: "", greenEx: "", meditation: "", centering: "", reading: "", cooking: "", mission: "", meal: "" });
             const [activeTab, setActiveTab] = useState('input');
             const [lastSaved, setLastSaved] = useState("待機中");
             
@@ -94,6 +95,7 @@
                         let weight = 1;
                         if (curr.key === 'hiit') weight = HIIT_WEIGHT;
                         if (curr.key === 'cooking') weight = COOKING_WEIGHT;
+                        // 読書は1ページ1ptとして計算（必要に応じて調整可能）
                         return acc + (curr.value * weight);
                     }, 0);
             }, [history]);
@@ -117,7 +119,7 @@
                 if (isMagicActive) {
                     return { name: "シウ＆ケン", type: "orange", msg: "hiroさん、500pt達成！魔法が解けないうちに次も狙うニャ✨" };
                 }
-                return { name: "シウ", type: "silver", msg: "冷水シャワーと弁当も追加したニャ。一歩ずつ完璧に近づいてるニャ！" };
+                return { name: "シウ", type: "silver", msg: "読書も追加したニャ！知識は一生の宝物になるニャ✨" };
             }, [isMagicActive]);
 
             const InputCard = ({ id, label, icon, color, unit, presets = [], weightText = "" }) => (
@@ -167,111 +169,4 @@
                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Weekly Magic Gauge</span>
                             <span className={`text-xs font-black ${isMagicActive ? 'text-amber-500' : 'text-indigo-600'}`}>{weeklyPoints} / {WEEKLY_GOAL} Pts</span>
                         </div>
-                        <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
-                            <div className={`h-full transition-all duration-1000 ${isMagicActive ? 'bg-gradient-to-r from-amber-400 to-yellow-500' : 'bg-indigo-500'}`} 
-                                 style={{ width: `${Math.min(100, (weeklyPoints / WEEKLY_GOAL) * 100)}%` }}></div>
-                        </div>
-                    </div>
-
-                    {/* 猫メッセージ */}
-                    <div className={`rounded-[2.5rem] p-6 mb-8 text-white shadow-lg transition-all duration-700 ${isMagicActive ? 'luxury-aura' : ''} ${catData.type === 'silver' ? 'from-slate-600 to-slate-800' : 'from-orange-400 to-amber-500'} bg-gradient-to-r`}>
-                      <div className="flex items-center gap-4">
-                        <img src={CAT_IMAGES[catData.type]} className="w-14 h-14 rounded-full border-2 border-white/40 object-cover" alt="cat" />
-                        <div>
-                          <p className="text-[10px] font-bold opacity-80 uppercase">{catData.name}</p>
-                          <p className={`font-bold italic ${isMagicActive ? 'text-[16px] magic-text' : 'text-sm'}`}>「{catData.msg}」</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {activeTab === 'input' ? (
-                        <div className="space-y-4">
-                            <div className="flex items-center gap-3 bg-white p-4 rounded-[2rem] shadow-sm border border-slate-100 mb-2">
-                                <Icon name="calendar" className="text-indigo-400" />
-                                <input type="date" value={targetDate} onChange={(e) => setTargetDate(e.target.value)} className="bg-transparent font-bold text-slate-700 outline-none w-32" />
-                            </div>
-
-                            {/* クイック完了ボタン（冷水シャワー & 弁当） */}
-                            <div className="grid grid-cols-2 gap-3 mb-2">
-                                <button onClick={() => addItem('coldShower', 1)} className="flex items-center justify-between bg-blue-500 text-white p-5 rounded-[2rem] shadow-md active:scale-95 transition-all">
-                                    <div className="flex flex-col items-start">
-                                        <Icon name="snowflake" size={20} />
-                                        <span className="text-[10px] font-bold uppercase mt-1">Cold Shower</span>
-                                        <span className="text-lg font-black leading-none">冷水シャワー</span>
-                                    </div>
-                                    <span className="bg-white/20 px-2 py-1 rounded-lg text-xs font-bold">{(selectedDayTotals['coldShower'] || 0)}</span>
-                                </button>
-                                <button onClick={() => addItem('bento', 1)} className="flex items-center justify-between bg-emerald-500 text-white p-5 rounded-[2rem] shadow-md active:scale-95 transition-all">
-                                    <div className="flex flex-col items-start">
-                                        <Icon name="package" size={20} />
-                                        <span className="text-[10px] font-bold uppercase mt-1">Bento Box</span>
-                                        <span className="text-lg font-black leading-none">弁当完了</span>
-                                    </div>
-                                    <span className="bg-white/20 px-2 py-1 rounded-lg text-xs font-bold">{(selectedDayTotals['bento'] || 0)}</span>
-                                </button>
-                            </div>
-
-                            <div className="p-6 rounded-[2.5rem] bg-indigo-50 border border-indigo-100 space-y-3 shadow-sm">
-                                <div className="flex items-center gap-2 font-bold text-indigo-600 text-[10px] uppercase tracking-widest"><Icon name="flag" size={14} /> 今日のミッション</div>
-                                <div className="flex gap-2">
-                                    <input type="text" placeholder="例：散歩した" value={inputValues.mission}
-                                        onChange={(e) => setInputValues({...inputValues, mission: e.target.value})}
-                                        onKeyDown={(e) => e.key === 'Enter' && addItem('mission', inputValues.mission)}
-                                        className="flex-1 bg-white border-none rounded-2xl px-4 py-3 text-sm outline-none"
-                                    />
-                                    <button onClick={() => addItem('mission', inputValues.mission)} className="bg-indigo-600 text-white p-3 rounded-2xl shadow-md"><Icon name="send" /></button>
-                                </div>
-                            </div>
-
-                            <div className="p-6 rounded-[2.5rem] bg-rose-50 border border-rose-100 space-y-3 shadow-sm">
-                                <div className="flex items-center gap-2 font-bold text-rose-600 text-[10px] uppercase tracking-widest"><Icon name="utensils" size={14} /> 本日の絶品メニュー</div>
-                                <div className="flex gap-2">
-                                    <input type="text" placeholder="例：サーモントラウトのソテー" value={inputValues.meal}
-                                        onChange={(e) => setInputValues({...inputValues, meal: e.target.value})}
-                                        onKeyDown={(e) => e.key === 'Enter' && addItem('meal', inputValues.meal)}
-                                        className="flex-1 bg-white border-none rounded-2xl px-4 py-3 text-sm outline-none"
-                                    />
-                                    <button onClick={() => addItem('meal', inputValues.meal)} className="bg-rose-500 text-white p-3 rounded-2xl shadow-md"><Icon name="heart" /></button>
-                                </div>
-                            </div>
-
-                            <InputCard id="hiit" label="HIIT" icon="zap" color="text-red-500" unit="分" presets={[4, 8, 12]} weightText="×20pts" />
-                            <InputCard id="cooking" label="料理記録" icon="chef-hat" color="text-rose-500" unit="回" presets={[1, 2, 3]} weightText="×30pts" />
-                            <InputCard id="centering" label="センタリング" icon="compass" color="text-blue-500" unit="分" presets={[10, 20, 30]} />
-                            <InputCard id="meditation" label="瞑想" icon="flower-2" color="text-purple-500" unit="分" presets={[10, 20, 30]} />
-                        </div>
-                    ) : (
-                        <div className="space-y-6">
-                            {weeklyBestDish && (
-                                <div className="p-8 rounded-[2.5rem] bg-white shadow-lg border-2 border-rose-100 text-center space-y-2">
-                                    <div className="inline-flex p-3 bg-rose-500 text-white rounded-full mb-2"><Icon name="award" size={24} /></div>
-                                    <h2 className="text-[10px] font-black text-rose-400 uppercase tracking-widest">Week's Best Dish</h2>
-                                    <p className="text-xl font-black text-slate-800 leading-tight">「{weeklyBestDish}」</p>
-                                </div>
-                            )}
-
-                            <div className="bg-white rounded-[2.5rem] p-6 shadow-sm border border-slate-100">
-                                <h2 className="text-xs font-bold text-slate-400 mb-4 uppercase tracking-widest">履歴ログ</h2>
-                                <div className="max-h-64 overflow-y-auto space-y-2 pr-2 no-scrollbar">
-                                    {history.slice().reverse().map(entry => (
-                                        <div key={entry.id} className="flex justify-between items-center py-2 border-b border-slate-50">
-                                            <div>
-                                                <p className="text-[8px] font-bold text-slate-300 uppercase">{entry.date} / {entry.key}</p>
-                                                <p className="text-sm font-bold text-slate-700">{typeof entry.value === 'number' ? `+${entry.value}` : entry.value}</p>
-                                            </div>
-                                            <button onClick={() => deleteEntry(entry.id)} className="text-slate-200 hover:text-red-400 transition-colors"><Icon name="trash-2" size={14} /></button>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            );
-        };
-
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<HabitTracker />);
-    </script>
-</body>
-</html>
+                        <div className="h-3 bg-slate-100 rounded-full overflow-
