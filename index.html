@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Habit Vibe 8.2</title>
+    <title>Habit Vibe 8.3 (Stable)</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin></script>
@@ -23,13 +23,25 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useMemo } = React;
+        const { useState, useEffect, useMemo, useRef } = React;
 
+        // 【修正完了】Reactがクラッシュしない安全なアイコン描画
         const Icon = ({ name, size = 18, className = "" }) => {
-            useEffect(() => { 
-                if (window.lucide) window.lucide.createIcons(); 
-            }, [name]);
-            return <i data-lucide={name} className={className} style={{ width: size, height: size, display: 'inline-block' }}></i>;
+            const spanRef = useRef(null);
+            
+            useEffect(() => {
+                if (spanRef.current && window.lucide) {
+                    // Reactの管理外でアイコンを生成する
+                    spanRef.current.innerHTML = `<i data-lucide="${name}"></i>`;
+                    window.lucide.createIcons({
+                        root: spanRef.current,
+                        attrs: { width: size, height: size }
+                    });
+                }
+            }, [name, size]);
+
+            // Reactにはこの空のspanだけを管理させる
+            return <span ref={spanRef} className={className} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: size, height: size }}></span>;
         };
 
         const CAT_IMAGES = {
@@ -53,13 +65,20 @@
             const WEEKLY_GOAL = 500;
 
             useEffect(() => {
-                const saved = localStorage.getItem('habit-v6-direct');
-                if (saved) { setHistory(JSON.parse(saved)); setLastSaved("同期完了"); }
-                
-                const timer = setTimeout(() => {
-                    if (window.lucide) window.lucide.createIcons();
-                }, 100);
-                return () => clearTimeout(timer);
+                // 【修正完了】データ読み込み時のクラッシュ防止（安全装置）
+                try {
+                    const saved = localStorage.getItem('habit-v6-direct');
+                    if (saved) { 
+                        const parsedData = JSON.parse(saved);
+                        if (Array.isArray(parsedData)) {
+                            setHistory(parsedData); 
+                        }
+                    }
+                    setLastSaved("同期完了");
+                } catch (error) {
+                    console.error("データの読み込みに失敗しました:", error);
+                    setLastSaved("読込エラー");
+                }
             }, []);
 
             const playHappyMeow = () => {
@@ -170,4 +189,59 @@
 
             return (
                 <div className="max-w-md mx-auto p-4 pb-24 min-h-screen">
-                    <header className="flex justify-
+                    <header className="flex justify-between items-center mb-4 px-1">
+                        <div>
+                          <h1 className="text-2xl font-black text-indigo-600 italic leading-none">Habit Vibe 8.3</h1>
+                          <span className="text-[10px] font-bold text-emerald-500 flex items-center gap-1 mt-1 tracking-widest uppercase"><Icon name="check-circle" size={10} /> {lastSaved}</span>
+                        </div>
+                        <div className="flex gap-2 bg-white p-1 rounded-2xl shadow-sm border border-slate-100">
+                          <button onClick={() => setActiveTab('input')} className={`p-2.5 rounded-xl transition-all ${activeTab === 'input' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400'}`}><Icon name="edit-3" size={18} /></button>
+                          <button onClick={() => setActiveTab('stats')} className={`p-2.5 rounded-xl transition-all ${activeTab === 'stats' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400'}`}><Icon name="bar-chart-2" size={18} /></button>
+                        </div>
+                    </header>
+
+                    <div className="mb-4 flex items-center gap-3 bg-white p-4 rounded-[2rem] shadow-sm border border-slate-100 fade-in text-sm">
+                        <Icon name="calendar" className="text-indigo-400" />
+                        <input type="date" value={targetDate} onChange={(e) => setTargetDate(e.target.value)} className="bg-transparent font-bold text-slate-700 outline-none w-32" />
+                        {targetDate !== todayStr && <button onClick={() => setTargetDate(todayStr)} className="ml-auto text-[10px] font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-full">今日へ</button>}
+                    </div>
+
+                    <div className="mb-6 px-1">
+                        <div className="flex justify-between items-end mb-2">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">週間ご褒美ゲージ</span>
+                            <span className={`text-xs font-black ${isLuxuryMode ? 'text-amber-500' : 'text-indigo-600'}`}>{weeklyPoints} / {WEEKLY_GOAL} <span className="text-[9px] font-normal text-slate-400 italic">Total Pts</span></span>
+                        </div>
+                        <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
+                            <div className={`h-full transition-all duration-1000 ${isLuxuryMode ? 'bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 shadow-[0_0_12px_#fbbf24]' : 'bg-indigo-500'}`} 
+                                 style={{ width: `${Math.min(100, (weeklyPoints / WEEKLY_GOAL) * 100)}%` }}></div>
+                        </div>
+                    </div>
+
+                    <div className={`rounded-[2.5rem] p-5 mb-6 text-white shadow-lg relative overflow-hidden transition-all duration-500 
+                        ${isLuxuryMode ? 'luxury-aura scale-[1.03]' : ''}
+                        ${catData.type === 'silver' ? 'from-slate-600 to-slate-800' : 'from-orange-400 to-amber-500'} bg-gradient-to-r`}>
+                      <div className="relative z-10 flex items-center gap-4">
+                        <img src={CAT_IMAGES[catData.type]} className={`w-14 h-14 rounded-full border-2 border-white/40 object-cover shadow-inner bg-white/20 ${isLuxuryMode ? 'ring-4 ring-yellow-400 animate-pulse' : ''}`} alt="cat" />
+                        <div className="flex-1">
+                          <p className="text-[10px] font-bold opacity-80 uppercase tracking-widest mb-0.5">{catData.name} {isLuxuryMode && "✨Master"}</p>
+                          <p className={`font-bold italic leading-relaxed ${isLuxuryMode ? 'text-[15px]' : 'text-sm'}`}>「{catData.msg}」</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {activeTab === 'input' ? (
+                      <div className="space-y-4">
+                        <div className="p-6 rounded-[2.5rem] bg-indigo-50 border border-indigo-100 space-y-3 shadow-sm fade-in">
+                            <div className="flex items-center gap-2 font-bold text-indigo-600 text-[10px] uppercase tracking-widest"><Icon name="flag" size={14} /> 今日のミッション</div>
+                            <div className="flex gap-2">
+                                <input type="text" placeholder="例：トレーニングした！" value={inputValues.mission}
+                                    onChange={(e) => setInputValues({...inputValues, mission: e.target.value})}
+                                    onKeyDown={(e) => e.key === 'Enter' && addItem('mission', inputValues.mission)}
+                                    className="flex-1 bg-white border-none rounded-2xl px-4 py-3 text-sm outline-none shadow-sm"
+                                />
+                                <button onClick={() => addItem('mission', inputValues.mission)} className="bg-indigo-600 text-white p-3 rounded-2xl shadow-md active:scale-95"><Icon name="send" /></button>
+                            </div>
+                        </div>
+
+                        <div className="p-6 rounded-[2.5rem] bg-rose-50 border border-rose-100 space-y-3 shadow-sm fade-in">
+                            <div className="flex items
