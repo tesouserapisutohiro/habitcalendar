@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Habit Vibe 8.3</title>
+    <title>Habit Vibe 8.4</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        body { -webkit-tap-highlight-color: transparent; font-family: sans-serif; overflow-x: hidden; background-color: #f8fafc; }
+        body { -webkit-tap-highlight-color: transparent; font-family: sans-serif; background-color: #f8fafc; overflow-x: hidden; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
         .fade-in { animation: fadeIn 0.4s ease-out forwards; }
@@ -20,23 +20,18 @@
 </head>
 <body>
     <div id="root">
-        <div class="flex items-center justify-center min-h-screen text-slate-400">
-            Vibe Coding 接続中... (数秒かかります)
+        <div style="display: flex; align-items: center; justify-content: center; min-height: 100vh; color: #94a3b8; font-size: 14px;">
+            Vibe Coding 起動を試みています...
         </div>
     </div>
 
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
 
-        // アイコンコンポーネント（安全設計）
-        const Icon = ({ name, size = 18, className = "" }) => {
-            useEffect(() => {
-                if (window.lucide) {
-                    try { window.lucide.createIcons(); } catch (e) {}
-                }
-            }, [name]);
-            return <i data-lucide={name} className={className} style={{ width: size, height: size, display: 'inline-block' }}></i>;
-        };
+        // アイコンコンポーネント（超軽量版）
+        const Icon = ({ name, size = 18, className = "" }) => (
+            <i data-lucide={name} className={className} style={{ width: size, height: size, display: 'inline-block' }}></i>
+        );
 
         const CAT_IMAGES = {
             silver: "https://images.unsplash.com/photo-1513245543132-31f507417b26?auto=format&fit=crop&q=80&w=200&h=200",
@@ -54,7 +49,7 @@
 
             const WEEKLY_GOAL = 500;
 
-            // 初期ロード
+            // 初期化
             useEffect(() => {
                 try {
                     const saved = localStorage.getItem('habit-v6-direct');
@@ -63,10 +58,18 @@
                         if (Array.isArray(parsed)) setHistory(parsed);
                     }
                     setLastSaved("同期完了");
-                } catch (e) { setLastSaved("データ初期化"); }
+                } catch (e) {
+                    console.error("Data Load Error");
+                }
+                // アイコンの初期化
+                if (window.lucide) window.lucide.createIcons();
             }, []);
 
-            // 猫の鳴き声（エラー防止）
+            // アイコンの更新監視
+            useEffect(() => {
+                if (window.lucide) window.lucide.createIcons();
+            });
+
             const playMeow = () => {
                 try {
                     const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -89,7 +92,7 @@
             };
 
             const addItem = (key, value) => {
-                if (value === undefined || value === null || value.toString().trim() === "") return;
+                if (!value || value.toString().trim() === "") return;
                 
                 let entryValue;
                 if (key === 'mission' || key === 'meal') {
@@ -120,11 +123,11 @@
                 entry ? deleteEntry(entry.id) : addItem(key, 1);
             };
 
-            // 【ポイント計算】HIIT:20x, 料理:30x, 冷水/弁当:10pt
+            // 週間ポイント集計（HIIT:20x, 料理:30x, 冷水/弁当:10pt）
             const weeklyPoints = useMemo(() => {
-                const dateLimit = new Date();
-                dateLimit.setDate(dateLimit.getDate() - 7);
-                const limitStr = dateLimit.toLocaleDateString('sv-SE');
+                const limit = new Date();
+                limit.setDate(limit.getDate() - 7);
+                const limitStr = limit.toLocaleDateString('sv-SE');
                 
                 return history
                     .filter(e => e.date >= limitStr && typeof e.value === 'number')
@@ -139,10 +142,68 @@
 
             const isLuxuryMode = weeklyPoints >= WEEKLY_GOAL;
 
-            // 今週のベスト料理（最新の美味しいご飯を抽出）
+            // 今週のベスト料理
             const weeklyBestDish = useMemo(() => {
-                const dateLimit = new Date();
-                dateLimit.setDate(dateLimit.getDate() - 7);
-                const limitStr = dateLimit.toLocaleDateString('sv-SE');
+                const limit = new Date();
+                limit.setDate(limit.getDate() - 7);
+                const limitStr = limit.toLocaleDateString('sv-SE');
                 const dishes = history.filter(e => e.date >= limitStr && e.key === 'meal');
                 return dishes.length > 0 ? dishes[dishes.length - 1].value : null;
+            }, [history]);
+
+            // 選択日の合計
+            const selectedDayTotals = useMemo(() => {
+                const res = {};
+                history.filter(e => e.date === targetDate).forEach(e => {
+                    if (typeof e.value === 'number') res[e.key] = (res[e.key] || 0) + e.value;
+                });
+                return res;
+            }, [history, targetDate]);
+
+            // 猫メッセージ
+            const catData = useMemo(() => {
+                const isPast = targetDate < todayStr;
+                const pool = isLuxuryMode ? [
+                    { name: "シウ", type: "silver", msg: "hiroさん、500pt達成！凄すぎて胸がいっぱいニャ…♡" },
+                    { name: "ケン", type: "orange", msg: "伝説のMaster hiro！僕たちはずっと付いていくニャ！" }
+                ] : [
+                    { name: "シウ", type: "silver", msg: isPast ? "昨日の分も埋めるなんて、誠実で素敵だニャ。" : "センタリングで自分を整えようニャ。" },
+                    { name: "ケン", type: "orange", msg: "HIITは20倍、料理は30倍！冷水と弁当も各10ptだニャ！" }
+                ];
+                return pool[Math.floor(Math.random() * pool.length)];
+            }, [targetDate, isLuxuryMode]);
+
+            const InputCard = ({ id, label, icon, color, unit, presets = [], weight = "" }) => (
+                <div className="p-5 rounded-[2.5rem] bg-white border border-slate-100 shadow-sm space-y-4 fade-in">
+                    <div className="flex items-center justify-between px-1">
+                        <div className="flex items-center gap-2 font-bold text-slate-600 text-sm">
+                            <Icon name={icon} className={color} />
+                            <span>{label} <span className="text-[9px] text-slate-300 ml-1">{weight}</span></span>
+                        </div>
+                        <div className="text-right">
+                            <span className="text-2xl font-black text-slate-800">{(selectedDayTotals[id] || 0)}</span>
+                            <span className="text-[10px] text-slate-400 ml-1 uppercase">{unit}</span>
+                        </div>
+                    </div>
+                    <div className="flex gap-2">
+                        <input type="number" inputMode="numeric" placeholder="数字を入力" value={inputValues[id] || ""}
+                            onChange={(e) => setInputValues({...inputValues, [id]: e.target.value})}
+                            onKeyDown={(e) => e.key === 'Enter' && addItem(id, inputValues[id])}
+                            className="flex-1 bg-slate-50 border-none rounded-2xl px-4 py-3 text-lg font-bold outline-none shadow-sm focus:ring-2 focus:ring-indigo-500"
+                        />
+                        <button onClick={() => addItem(id, inputValues[id])} className="bg-indigo-600 text-white px-6 rounded-2xl shadow-md active:scale-95 transition-transform"><Icon name="plus" size={24} /></button>
+                    </div>
+                    <div className="flex gap-2 pt-1 overflow-x-auto no-scrollbar">
+                        {presets.map(val => (
+                            <button key={val} onClick={() => addItem(id, val)} className="bg-slate-100 text-slate-600 text-[11px] font-bold px-4 py-2 rounded-xl active:bg-slate-200 shrink-0">+{val}{unit}</button>
+                        ))}
+                    </div>
+                </div>
+            );
+
+            return (
+                <div className="max-w-md mx-auto p-4 pb-24 min-h-screen relative">
+                    <header className="flex justify-between items-center mb-4 px-1">
+                        <div>
+                          <h1 className="text-2xl font-black text-indigo-600 italic leading-none">Habit Vibe 8.4</h1>
+                          <span className="text-[10px] font-bold text-emerald-5
