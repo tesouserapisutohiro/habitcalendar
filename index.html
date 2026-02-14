@@ -8,7 +8,6 @@
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         body { -webkit-tap-highlight-color: transparent; font-family: sans-serif; overflow-x: hidden; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -36,134 +35,12 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
 
-        // アイコンコンポーネント（エラー防止機能付き）
-        const Icon = ({ name, size = 18, className = "" }) => {
-            useEffect(() => { 
-                if (window.lucide) {
-                    window.lucide.createIcons();
-                }
-            }, [name]);
-            return <i data-lucide={name} className={className} style={{ width: size, height: size, display: 'inline-block' }}></i>;
-        };
-
-        const CAT_IMAGES = {
-            silver: "https://images.unsplash.com/photo-1513245543132-31f507417b26?auto=format&fit=crop&q=80&w=200&h=200",
-            orange: "https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?auto=format&fit=crop&q=80&w=200&h=200"
-        };
-
-        const HabitTracker = () => {
-            const [history, setHistory] = useState([]);
-            
-            // 修正箇所: reading を確実に初期化
-            const [inputValues, setInputValues] = useState({ 
-                hiit: "", 
-                reading: "", // ←ここが重要です
-                meditation: "", 
-                centering: "", 
-                cooking: "", 
-                mission: "", 
-                meal: "" 
-            });
-            
-            const [activeTab, setActiveTab] = useState('input');
-            const [lastSaved, setLastSaved] = useState("待機中");
-            
-            const todayStr = new Date().toLocaleDateString('sv-SE');
-            const [targetDate, setTargetDate] = useState(todayStr);
-
-            const WEEKLY_GOAL = 500;
-            const HIIT_WEIGHT = 20;
-            const COOKING_WEIGHT = 30;
-
-            // データ読み込み
-            useEffect(() => {
-                try {
-                    const saved = localStorage.getItem('habit-v8-magic');
-                    if (saved) { setHistory(JSON.parse(saved)); setLastSaved("同期完了"); }
-                } catch (e) {
-                    console.error("Load error", e);
-                }
-            }, []);
-
-            // データ保存
-            const updateStorage = (newHistory) => {
-                setHistory(newHistory);
-                localStorage.setItem('habit-v8-magic', JSON.stringify(newHistory));
-                setLastSaved(`保存済: ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`);
-            };
-
-            const addItem = (key, value) => {
-                if (value === undefined || value === null || value.toString().trim() === "") return;
-                const entryValue = (typeof value === 'string' && isNaN(parseInt(value, 10))) ? value.toString().trim() : parseInt(value, 10);
-                
-                const newEntry = { id: Date.now(), date: targetDate, key, value: entryValue };
-                updateStorage([...history, newEntry]);
-                
-                // 特定のキー以外は入力をクリア
-                if (key !== 'coldShower' && key !== 'bento') {
-                    setInputValues(prev => ({ ...prev, [key]: "" }));
-                }
-            };
-
-            const deleteEntry = (id) => updateStorage(history.filter(e => e.id !== id));
-
-            // ポイント計算
-            const weeklyPoints = useMemo(() => {
-                const limitDate = new Date();
-                limitDate.setDate(limitDate.getDate() - 7);
-                const limitStr = limitDate.toLocaleDateString('sv-SE');
-                
-                return history
-                    .filter(e => e.date >= limitStr && typeof e.value === 'number')
-                    .reduce((acc, curr) => {
-                        let weight = 1;
-                        if (curr.key === 'hiit') weight = HIIT_WEIGHT;
-                        if (curr.key === 'cooking') weight = COOKING_WEIGHT;
-                        // 読書はページ数そのまま(1pt)
-                        return acc + (curr.value * weight);
-                    }, 0);
-            }, [history]);
-
-            const isMagicActive = weeklyPoints >= WEEKLY_GOAL;
-
-            const weeklyBestDish = useMemo(() => {
-                const limitDate = new Date();
-                limitDate.setDate(limitDate.getDate() - 7);
-                const limitStr = limitDate.toLocaleDateString('sv-SE');
-                const dishes = history.filter(e => e.date >= limitStr && e.key === 'meal');
-                return dishes.length > 0 ? dishes[dishes.length - 1].value : null;
-            }, [history]);
-
-            const selectedDayTotals = useMemo(() => history.filter(e => e.date === targetDate).reduce((acc, curr) => {
-                if (typeof curr.value === 'number') acc[curr.key] = (acc[curr.key] || 0) + curr.value;
-                return acc;
-            }, {}), [history, targetDate]);
-
-            const catData = useMemo(() => {
-                if (isMagicActive) {
-                    return { name: "シウ＆ケン", type: "orange", msg: "hiroさん、500pt達成！魔法が解けないうちに次も狙うニャ✨" };
-                }
-                return { name: "シウ", type: "silver", msg: "読書も追加したニャ。知識が増えると世界が広がるニャ！" };
-            }, [isMagicActive]);
-
-            // 入力カードコンポーネント（安全策を追加）
-            const InputCard = ({ id, label, icon, color, unit, presets = [], weightText = "" }) => (
-                <div className="p-5 rounded-[2.5rem] bg-white border border-slate-100 shadow-sm space-y-4">
-                    <div className="flex items-center justify-between px-1">
-                        <div className="flex items-center gap-2 font-bold text-slate-600">
-                            <Icon name={icon} className={color} />
-                            <span className="text-sm">{label} <span className="text-[9px] text-slate-400 ml-1">{weightText}</span></span>
-                        </div>
-                        <div className="text-right">
-                            <span className="text-2xl font-black text-slate-800">{(selectedDayTotals[id] || 0)}</span>
-                            <span className="text-[10px] text-slate-400 ml-1 uppercase">{unit}</span>
-                        </div>
-                    </div>
-                    <div className="flex gap-2">
-                        <input 
-                            type="number" 
-                            inputMode="numeric" 
-                            placeholder="入力" 
-                            value={inputValues[id] || ""} 
-                            onChange={(e) => setInputValues({...inputValues, [id]: e.target.value})}
-                            onKeyDown={(e) => e
+        // --- アイコンデータを内部に定義（読み込みエラー防止） ---
+        const ICONS = {
+            'plus': <path d="M5 12h14M12 5v14"/>,
+            'edit-3': <g><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></g>,
+            'bar-chart-2': <g><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></g>,
+            'calendar': <g><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></g>,
+            'snowflake': <g><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/><path d="M20 16.6L16.6 20"/><path d="M20 7.4L16.6 4"/><path d="M4 7.4L7.4 4"/><path d="M4 16.6L7.4 20"/></g>,
+            'package': <g><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></g>,
+            'flag': <g><path
