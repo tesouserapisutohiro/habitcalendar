@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Habit Vibe 8.8 - logic Tuned</title>
+    <title>Habit Vibe 8.9 - Stable</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin></script>
@@ -19,8 +19,8 @@
         }
         @keyframes pulse-gold {
             0% { transform: scale(1.03); }
-            100% { transform: scale(1.03); }
             50% { transform: scale(1.05); }
+            100% { transform: scale(1.03); }
         }
         .magic-text {
             background: linear-gradient(90deg, #fbbf24, #f59e0b, #fbbf24);
@@ -36,8 +36,13 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
 
+        // アイコンコンポーネント（エラー防止付き）
         const Icon = ({ name, size = 18, className = "" }) => {
-            useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, [name]);
+            useEffect(() => { 
+                if (window.lucide && window.lucide.createIcons) {
+                    window.lucide.createIcons(); 
+                }
+            }, [name]);
             return <i data-lucide={name} className={className} style={{ width: size, height: size, display: 'inline-block' }}></i>;
         };
 
@@ -47,6 +52,7 @@
         };
 
         const HabitTracker = () => {
+            // 初期データの安全な読み込み
             const [history, setHistory] = useState([]);
             const [inputValues, setInputValues] = useState({ hiit: "", greenEx: "", meditation: "", centering: "", pages: "", cooking: "", mission: "", meal: "" });
             const [activeTab, setActiveTab] = useState('input');
@@ -55,73 +61,41 @@
             const todayStr = new Date().toLocaleDateString('sv-SE');
             const [targetDate, setTargetDate] = useState(todayStr);
 
-            // ポイント重み付け設定
+            // 【倍率設定】ご指定のルール
             const WEEKLY_GOAL = 500;
             const WEIGHTS = {
-                cooking: 30,
-                hiit: 20,
-                coldShower: 10,
-                bento: 10,
-                default: 1
+                cooking: 30,     // 料理 30倍
+                hiit: 20,        // HIIT 20倍
+                coldShower: 10,  // 冷水シャワー 10倍
+                bento: 10,       // 弁当 10倍
+                // その他（瞑想、読書、センタリング、GreenEX）はデフォルトの1倍
             };
 
+            // データ読み込み（nullチェック強化）
             useEffect(() => {
-                const saved = localStorage.getItem('habit-v8-magic');
-                if (saved) { setHistory(JSON.parse(saved)); setLastSaved("同期完了"); }
+                try {
+                    const saved = localStorage.getItem('habit-v8-magic');
+                    if (saved) {
+                        const parsed = JSON.parse(saved);
+                        if (Array.isArray(parsed)) {
+                            setHistory(parsed);
+                            setLastSaved("同期完了");
+                        }
+                    }
+                } catch (e) {
+                    console.error("Data load error", e);
+                    setLastSaved("データ復旧");
+                }
             }, []);
 
+            // データ保存
             const updateStorage = (newHistory) => {
                 setHistory(newHistory);
                 localStorage.setItem('habit-v8-magic', JSON.stringify(newHistory));
                 setLastSaved(`保存済: ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`);
             };
 
+            // 項目追加
             const addItem = (key, value) => {
-                if (value === undefined || value === null || value.toString().trim() === "") return;
-                const entryValue = (typeof value === 'string' && isNaN(parseInt(value, 10))) ? value.toString().trim() : parseInt(value, 10);
-                
-                const newEntry = { id: Date.now(), date: targetDate, key, value: entryValue };
-                updateStorage([...history, newEntry]);
-                if (!['coldShower', 'bento', 'mission', 'meal'].includes(key)) {
-                    setInputValues({ ...inputValues, [key]: "" });
-                }
-            };
-
-            const deleteEntry = (id) => updateStorage(history.filter(e => e.id !== id));
-
-            const weeklyPoints = useMemo(() => {
-                const limitDate = new Date();
-                limitDate.setDate(limitDate.getDate() - 7);
-                const limitStr = limitDate.toLocaleDateString('sv-SE');
-                
-                return history
-                    .filter(e => e.date >= limitStr && typeof e.value === 'number')
-                    .reduce((acc, curr) => {
-                        const weight = WEIGHTS[curr.key] || WEIGHTS.default;
-                        return acc + (curr.value * weight);
-                    }, 0);
-            }, [history]);
-
-            const isMagicActive = weeklyPoints >= WEEKLY_GOAL;
-
-            const selectedDayTotals = useMemo(() => history.filter(e => e.date === targetDate).reduce((acc, curr) => {
-                if (typeof curr.value === 'number') acc[curr.key] = (acc[curr.key] || 0) + curr.value;
-                return acc;
-            }, {}), [history, targetDate]);
-
-            const catData = useMemo(() => {
-                if (isMagicActive) {
-                    return { name: "シウ", type: "silver", msg: "500pt到達！シウとケンも魔法で大はしゃぎだニャ✨" };
-                }
-                return { name: "ケン", type: "orange", msg: "冷水シャワーと弁当は各10pt！着実に稼いでいくニャ。" };
-            }, [isMagicActive]);
-
-            const InputCard = ({ id, label, icon, color, unit, presets = [], weightText = "" }) => (
-                <div className="p-5 rounded-[2.5rem] bg-white border border-slate-100 shadow-sm space-y-4">
-                    <div className="flex items-center justify-between px-1">
-                        <div className="flex items-center gap-2 font-bold text-slate-600">
-                            <Icon name={icon} className={color} />
-                            <span className="text-sm">{label} <span className="text-[9px] text-slate-400 ml-1">{weightText}</span></span>
-                        </div>
-                        <div className="text-right">
-                            <span className="text-2xl font-black text-slate-800">{(selectedDayTotals[id] || 0)}</span>
+                if (value === undefined || value === null || value === "") return;
+                //
